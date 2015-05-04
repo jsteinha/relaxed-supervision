@@ -1,7 +1,7 @@
-function ret = logZsrc(x, theta)
-    global L;
+function ret = logZsrc(xc, theta)
+    global W;
     ret = 0.0;
-    for i=1:L
-        ret = ret + logsumexp(theta(x(i),:));
+    for j=1:W
+        ret = ret + xc(j) * logsumexp(theta(j,:));
     end
 end

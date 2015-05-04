@@ -11,10 +11,11 @@ function [z,diff,logZtar,num_samples] = sample(x, y)
         for j=1:L
             z(j) = sampleOnce(x(j), u);
         end
-        diff = norm(max(accumarray(z',1,[W 1])-a, 0), 1);
-        logZtar = logsumexp([logZtar, -beta * diff]);
+        diff = logical((accumarray(z',1,[W 1])-a) ~= 0);
+        logScore = -sum(beta(diff));
+        logZtar = logsumexp([logZtar, logScore]);
         % see if we should accept
-        if rand < exp(-beta * diff)
+        if rand < exp(logScore)
             % if so, return estimate of normalization constant
             logZtar = logZtar - log(num_samples);
             %disp(num_samples);
