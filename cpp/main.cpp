@@ -10,6 +10,7 @@
 #include <limits>
 #include <iostream>
 #include "prettyprint.hpp"
+#include "snoptProblem.hpp"
 
 using namespace std;
 
@@ -18,7 +19,8 @@ const int L = 8; // sentence length
 const int N = 50; // number of examples
 const int TR = 10; // number of training iterations
 const int S = 10;
-const double eta = 0.06; // step size for learning
+//const double eta = 0.06; // step size for learning
+const double TAU = 100.0; // number of samples
 
 typedef vector<int> X;
 typedef multiset<int> Y;
@@ -118,7 +120,7 @@ Y z2y(const Z &z){
   return yhat;
 }
 
-double p_accept(const Z &z, const Y &y){
+double compute_cost(const Z &z, const Y &y){
   double cost = 0.0;
   Y yhat = z2y(z);
   set<int> ydiff = diff(y, yhat);
@@ -126,28 +128,142 @@ double p_accept(const Z &z, const Y &y){
     cost += theta[to_int(*yi)];
   }
   //cout << "cost: " << cost << endl;
-  return exp(-cost);
+  return cost;
 }
 
-Z sample(const X &x, const Y &y){
+Z sample(const X &x, const Y &y, double *logZ){
   int num_samples = 0;
+  *logZ = -INFINITY;
   while(true){
     ++num_samples;
     Z z;
     for(int i = 0; i < x.size(); i++){
       z.push_back(sample_once(x[i], y));
     }
-    if(rand() < p_accept(z, y) * RAND_MAX){
+    double cost = compute_cost(z, y);
+    *logZ = lse(*logZ, -cost);
+    if(rand() < exp(-cost) * RAND_MAX){
       cout << num_samples << " samples" << endl;
+      *logZ = (*logZ) - log(num_samples);
       return z;
     }
   }
 }
 
+// declare some structures that will be useful for the optimization
+typedef vector<pair<int,double>> LIN;
+vector<double>   c_vec;
+vector<LIN>      A_vec;
+vector<set<int>> u_vec;
+vector<int>      xtot;
+
+vector<example> examples;
+
+void objective ( int *mode,  int *nnObj, double w[],
+         double *fObj,  double gObj[], int *nState,
+         char    *cu, int *lencu,
+         int    iu[], int *leniu,
+         double ru[], int *lenru )
+{
+  //==================================================================
+  // Computes the nonlinear objective and constraint terms for the toy
+  // problem featured in the SnoptA users guide.
+  // m = 3, n = 2.
+  //
+  //   Minimize     x(2)
+  //
+  //   subject to   x(1)**2      + 4 x(2)**2  <= 4,
+  //               (x(1) - 2)**2 +   x(2)**2  <= 5,
+  //                x(1) >= 0.
+  //
+  //==================================================================
+
+  double lambda = L/(W * sqrt(N));
+  double Objective = 0.0;
+  // create regularizer
+  for(int i = 0; i < W*W; i++){
+    Objective += lambda * w[i] * w[i];
+    gObj[i] = 2 * lambda * w[i];
+  }
+  // initialize other values
+  vector<double> logC(W*W+W); // log of constraint
+  for(int i = W*W; i < W*W + W; i++) gObj[i] = 0;
+
+  double Constraint = 0.0;
+  // loop through examples
+  for(int n = 0; n < N; n++){
+    Objective += c_vec[n] / N;
+    double logConstraint = c_vec[n];
+    for(auto p : A_vec[n]){
+      Objective -= w[p.first] * p.second / N;
+      gObj[p.first] -= p.second / N;
+      logConstraint -= w[p.first] * p.second;
+    }
+    for(int x : examples[n].x){
+      double logZ = -INFINITY;
+      for(int u : u_vec[n]){
+        logZ = lse(logZ, w[to_int(T(x,u))]);
+      }
+      logConstraint += logZ;
+    }
+    logC[n] = logConstraint;
+    Constraint += exp(logConstraint) / N;
+  }
+  // add additional terms that we accumulated over examples
+  for(int i = 0; i < W; i++){
+    double beta = w[to_int(i)];
+    Objective += log(1 + (L-1) * exp(-beta));
+    gObj[to_int(i)] -= (L-1) / (exp(beta) + (L-1));
+  }
+  for(int x = 0; x < W; x++){
+    double logZ = -INFINITY;
+    for(int y = 0; y < W; y++){
+      logZ = lse(logZ, w[to_int(T(x,y))]);
+    }
+    Objective += xtot[x] * logZ / N;
+    for(int y = 0; y < W; y++){
+      double theta = w[to_int(T(x,y))];
+      gObj[to_int(T(x,y))] += xtot[x] * exp(theta - logZ) / N;
+    }
+  }
+
+
+  *fObj   =  Objective + max(TAU, log(Constraint));
+
+  if ( *mode == 0 || *mode == 2 ) {
+    // we already updated fObj
+  }
+
+  if ( *mode == 1 || *mode == 2 ) {
+    // only do this if necessary
+    if(Constraint >= TAU){
+      // need to update gradient to take into account constraint term
+      for(int n = 0; n < N; n++){
+        double wt = exp(logC[n]) / Constraint;
+        for(auto p : A_vec[n]){
+          gObj[p.first] -= p.second * wt;
+        }
+        for(int x : examples[n].x){
+          double logZ = -INFINITY;
+          for(int u : u_vec[n]){
+            logZ = lse(logZ, w[to_int(T(x,u))]);
+          }
+          for(int u : u_vec[n]){
+            gObj[to_int(T(x,u))] += exp(w[to_int(T(x,u))]-logZ) * wt;
+          }
+        }
+      }
+    }
+  }
+
+}
+
+
+
 int main(){
   static_assert(std::numeric_limits<float>::is_iec559, "IEEE 754 required");
   cout << "Generating examples..." << endl;
-  vector<example> examples;
+  //vector<example> examples;
   for(int i = 0; i < N; i++){
     examples.push_back(make_example_con());
   }
@@ -159,24 +275,46 @@ int main(){
     theta[to_int(i)] = 1.0/L;
   }
   for(int t = 0; t < TR; t++){
+    // initialize optimization structures
+    c_vec.clear();
+    A_vec.clear();
+    u_vec.clear();
+    xtot.clear();
+    xtot = vector<int>(W);
+
     // for each example
     for(example ex : examples){
+      // create c, A, u
+      double c_cur = 0.0;
+      LIN A_cur;
+      set<int> u_cur;
+      // update xtot
+      for(int x : ex.x) xtot[x]++;
+      // set u_cur
+      for(Y::iterator yj = ex.y.begin(); yj != ex.y.end(); yj = ex.y.upper_bound(*yj)){
+        u_cur.insert(*yj);
+      }
+
       cout << "Printing example..." << endl;
       cout << ex.x << endl;
       cout << ex.y << endl;
       // generate S samples
       cout << "Generating samples..." << endl;
       vector<Z> zs;
+      double logZ = 0.0, logZcur;
       for(int s = 0; s < S; s++){
-        zs.push_back(sample(ex.x, ex.y));
+        zs.push_back(sample(ex.x, ex.y, &logZcur));
+        logZ += logZcur / S;
         cout << "z: " << zs[s] << endl;
       }
+      c_cur -= logZ;
       cout << "Updating gradient..." << endl;
       // for now, just do gradient on log-likelihood
       // theta: +sum of theta values in samples, -sum of average theta
       // beta:  -sum of diffs in samples, + (L-1)exp(-beta)/(1+(L-1)exp(-beta))
-      for(Y::iterator yj = ex.y.begin(); yj != ex.y.end(); yj = ex.y.upper_bound(*yj)){
-        double& beta = theta[to_int(*yj)];
+      /*
+      for(int y : u_cur){
+        double& beta = theta[to_int(y)];
         beta += eta * (L-1)*exp(-beta)/(1+(L-1)*exp(-beta));
       }
       for(int x : ex.x){
@@ -189,15 +327,27 @@ int main(){
           th -= eta * exp(th - logZ);
         }
       }
+      */
       for(int s = 0; s < S; s++){
         for(int j = 0; j < L; j++){
-          theta[to_int(T(ex.x[j], zs[s][j]))] += eta/S;
+          int index = to_int(T(ex.x[j], zs[s][j]));
+          double val = 1.0/S;
+          A_cur.push_back(pair<int,double>(index, val));
+          c_cur += theta[index] * val;
+          //theta[to_int(T(ex.x[j], zs[s][j]))] += eta/S;
         }
         set<int> ydiff = diff(ex.y, z2y(zs[s]));
         for(int y : ydiff){
-          theta[to_int(y)] -= eta/S;
+          int index = to_int(y);
+          double val = -1.0/S;
+          A_cur.push_back(pair<int,double>(index, val));
+          c_cur += theta[index] * val;
+          //theta[to_int(y)] -= eta/S;
         }
       }
+      c_vec.push_back(c_cur);
+      A_vec.push_back(A_cur);
+      u_vec.push_back(u_cur);
     }
     cout << "Printing params..." << endl;
     cout << "THETA:" << endl;
