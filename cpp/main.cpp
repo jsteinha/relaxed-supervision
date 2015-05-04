@@ -13,7 +13,7 @@
 
 using namespace std;
 
-const int W = 14; // vocabulary size
+const int W = 15; // vocabulary size
 const int L = 8; // sentence length
 const int N = 50; // number of examples
 const int TR = 10; // number of training iterations
@@ -28,10 +28,24 @@ typedef struct {
   Y y;
 } example;
 
-example make_example(){
+example make_example_iid(){
   example e;
   for(int i = 0; i < L; i++){
     int c = rand() % W;
+    e.x.push_back(c);
+    e.y.insert(c);
+  }
+  return e;
+}
+
+example make_example_con(){
+  assert(W%3==0);
+  assert(L%2==0);
+  example e;
+  for(int i = 0; i < L; i++){
+    int c;
+    if(i%2==0){ c = 3 * (rand() % (W/3)); }
+    else { c = e.x[i-1] + 1 + rand() % 2; }
     e.x.push_back(c);
     e.y.insert(c);
   }
@@ -135,7 +149,7 @@ int main(){
   cout << "Generating examples..." << endl;
   vector<example> examples;
   for(int i = 0; i < N; i++){
-    examples.push_back(make_example());
+    examples.push_back(make_example_con());
   }
   cout << examples[0].x << endl;
   cout << examples[0].y << endl;
