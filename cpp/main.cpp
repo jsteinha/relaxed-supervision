@@ -165,19 +165,6 @@ void objective ( int *mode,  int *nnObj, double w[],
          int    iu[], int *leniu,
          double ru[], int *lenru )
 {
-  //==================================================================
-  // Computes the nonlinear objective and constraint terms for the toy
-  // problem featured in the SnoptA users guide.
-  // m = 3, n = 2.
-  //
-  //   Minimize     x(2)
-  //
-  //   subject to   x(1)**2      + 4 x(2)**2  <= 4,
-  //               (x(1) - 2)**2 +   x(2)**2  <= 5,
-  //                x(1) >= 0.
-  //
-  //==================================================================
-
   double lambda = L/(W * sqrt(N));
   double Objective = 0.0;
   // create regularizer
@@ -254,6 +241,24 @@ void objective ( int *mode,  int *nnObj, double w[],
         }
       }
     }
+  }
+
+}
+
+void constraint ( int *mode,  int *nnCon, int *nnJac, int *negCon,
+         double x[], double fCon[], double gCon[], int *nState,
+         char    *cu, int *lencu,
+         int    iu[], int *leniu,
+         double ru[], int *lenru )
+{
+
+  if ( *mode == 0 || *mode == 2 ) {
+    // no actual constraints
+    fCon[0] =  0;
+  }
+
+  if ( *mode == 1 || *mode == 2 ) {
+    // no actual constraints
   }
 
 }
@@ -349,6 +354,74 @@ int main(){
       A_vec.push_back(A_cur);
       u_vec.push_back(u_cur);
     }
+
+    cout << "Building SNOPT problem..." << endl;
+    snoptProblemB prob("the_optimization");
+    int n = W*W + W;
+    int m = 1; // actually zero
+    int ne = 1;
+    int nnCon = 0;
+    int nnObj = n;
+    int nnJac = 0;
+
+    int    *indJ = new int[ne];
+    int    *locJ = new int[n+1];
+    double *valJ = new double[ne];
+  
+    double *w  = new double[n+m];
+    double *bl = new double[n+m];
+    double *bu = new double[n+m];
+    double *pi = new double[m];
+    double *rc = new double[n+m];
+    int    *hs = new    int[n+m];
+  
+    int    iObj    = 0;
+    double ObjAdd  = 0;
+
+    int Cold = 0, Basis = 1, Warm = 2;
+
+    for(int i = 0; i < W*W; i++){
+      bl[i] = -5; bu[i] = 5;
+    }
+    for(int i = W*W; i < W*W + W; i++){
+      bl[i] = 1.0/L; bu[i] = 5;
+    }
+    bl[n] = -5; bu[n] = 5;
+
+    for ( int i = 0; i < n+m; i++ ) {
+      hs[i] = 0;
+       w[i] = 0;
+      rc[i] = 0;
+    }
+
+    for ( int i = 0; i < m; i++ ) {
+      pi[i] = 0;
+    }
+
+    for(int i = W*W; i < W*W+W; i++) w[i] = 1.0/L;
+
+    valJ[0] = indJ[0] = 0;
+    locJ[0] = 0;
+    for(int i = 1; i <= n; i++){
+      locJ[i] = 1;
+    }
+
+    prob.setProblemSize ( m, n, nnCon, nnJac, nnObj );
+    prob.setObjective   ( iObj, ObjAdd );
+    prob.setJ           ( ne, valJ, indJ, locJ );
+    prob.setX           ( bl, bu, w, pi, rc, hs );
+    
+    prob.setFunobj      ( objective );
+    prob.setFuncon      ( constraint );
+    
+    prob.setSpecsFile   ( "sntoy.spc" );
+    prob.setIntParameter( "Verify level", 3 );
+    prob.setIntParameter( "Derivative option", 3 );
+    
+    prob.solve          ( Cold );
+
+    exit(0);
+
     cout << "Printing params..." << endl;
     cout << "THETA:" << endl;
     for(int x = 0; x < W; x++){
