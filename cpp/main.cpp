@@ -13,11 +13,12 @@
 
 using namespace std;
 
-const int W = 21; // vocabulary size
-const int L = 12; // sentence length
-const int N = 1; // number of examples
-const int TR = 1; // number of training iterations
+const int W = 14; // vocabulary size
+const int L = 8; // sentence length
+const int N = 50; // number of examples
+const int TR = 10; // number of training iterations
 const int S = 10;
+const double eta = 0.06; // step size for learning
 
 typedef vector<int> X;
 typedef multiset<int> Y;
@@ -70,33 +71,47 @@ int sample_once(int xi, const Y &y){
   assert(false);
 }
 
-double p_accept(const Z &z, const Y &y){
-  double cost = 0.0;
+set<int> diff(const Y &y1, const Y &y2){
+  set<int> ret;
+  Y::const_iterator it1 = y1.begin(), end1 = y1.end();
+  Y::const_iterator it2 = y2.begin(), end2 = y2.end();
+  while(it1 != end1 || it2 != end2){
+    //cout << "y1 " << (*y1) << " y2 " << (*y2) << endl;
+    if(it1 == end1){
+      ret.insert(*it2);
+      it2 = y2.upper_bound(*it2);
+    } else if(it2 == end2) {
+      ret.insert(*it1);
+      it1 = y1.upper_bound(*it1);
+    } else {
+      if(*it1 > *it2){ 
+        ret.insert(*it2);
+        it2 = y2.upper_bound(*it2);
+      } else if(*it2 > *it1) {
+        ret.insert(*it1);
+        it1 = y1.upper_bound(*it1);
+      } else { ++it1; ++it2; }
+    }
+  }
+  return ret;
+}
+
+Y z2y(const Z &z){
   Y yhat;
   for(Z::const_iterator zi = z.begin(); zi != z.end(); ++zi){
     yhat.insert(*zi);
   }
-  Y::const_iterator y1 = y.begin(), end1 = y.end();
-  Y::const_iterator y2 = yhat.cbegin(), end2 = yhat.cend();
-  while(y1 != end1 || y2 != end2){
-    //cout << "y1 " << (*y1) << " y2 " << (*y2) << endl;
-    if(y1 == end1){
-      cost += theta[to_int(*y2)];
-      y2 = yhat.upper_bound(*y2);
-    } else if(y2 == end2) {
-      cost += theta[to_int(*y1)];
-      y1 = y.upper_bound(*y1);
-    } else {
-      if(*y1 > *y2){ 
-        cost += theta[to_int(*y2)];
-        y2 = yhat.upper_bound(*y2);
-      } else if(*y2 > *y1) {
-        cost += theta[to_int(*y1)];
-        y1 = y.upper_bound(*y1);
-      } else { ++y1; ++y2; }
-    }
+  return yhat;
+}
+
+double p_accept(const Z &z, const Y &y){
+  double cost = 0.0;
+  Y yhat = z2y(z);
+  set<int> ydiff = diff(y, yhat);
+  for(set<int>::iterator yi = ydiff.begin(); yi != ydiff.end(); ++yi){
+    cost += theta[to_int(*yi)];
   }
-  cout << "cost: " << cost << endl;
+  //cout << "cost: " << cost << endl;
   return exp(-cost);
 }
 
@@ -131,14 +146,56 @@ int main(){
   }
   for(int t = 0; t < TR; t++){
     // for each example
-    for(int i = 0; i < N; i++){
+    for(example ex : examples){
+      cout << "Printing example..." << endl;
+      cout << ex.x << endl;
+      cout << ex.y << endl;
       // generate S samples
       cout << "Generating samples..." << endl;
+      vector<Z> zs;
       for(int s = 0; s < S; s++){
-        Z z = sample(examples[i].x, examples[i].y);
-        cout << "z: " << z << endl;
+        zs.push_back(sample(ex.x, ex.y));
+        cout << "z: " << zs[s] << endl;
+      }
+      cout << "Updating gradient..." << endl;
+      // for now, just do gradient on log-likelihood
+      // theta: +sum of theta values in samples, -sum of average theta
+      // beta:  -sum of diffs in samples, + (L-1)exp(-beta)/(1+(L-1)exp(-beta))
+      for(Y::iterator yj = ex.y.begin(); yj != ex.y.end(); yj = ex.y.upper_bound(*yj)){
+        double& beta = theta[to_int(*yj)];
+        beta += eta * (L-1)*exp(-beta)/(1+(L-1)*exp(-beta));
+      }
+      for(int x : ex.x){
+        double logZ = -INFINITY;
+        for(int y = 0; y < W; y++){
+          logZ = lse(logZ, theta[to_int(T(x,y))]);
+        }
+        for(int y = 0; y < W; y++){
+          double &th = theta[to_int(T(x,y))];
+          th -= eta * exp(th - logZ);
+        }
+      }
+      for(int s = 0; s < S; s++){
+        for(int j = 0; j < L; j++){
+          theta[to_int(T(ex.x[j], zs[s][j]))] += eta/S;
+        }
+        set<int> ydiff = diff(ex.y, z2y(zs[s]));
+        for(int y : ydiff){
+          theta[to_int(y)] -= eta/S;
+        }
       }
     }
+    cout << "Printing params..." << endl;
+    cout << "THETA:" << endl;
+    for(int x = 0; x < W; x++){
+      double logZ = -INFINITY;
+      for(int y = 0; y < W; y++) logZ = lse(logZ, theta[to_int(T(x,y))]);
+      for(int y = 0; y < W; y++) printf("%.2f ", exp(theta[to_int(T(x,y))]-logZ));
+      printf("\n");
+    }
+    cout << "BETA:" << endl;
+    for(int y = 0; y < W; y++) printf("%.2f ", theta[to_int(y)]);
+    printf("\n");
   }
 
   return 0;
