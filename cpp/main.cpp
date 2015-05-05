@@ -14,10 +14,10 @@
 
 using namespace std;
 
-const int W = 21; // vocabulary size
-const int L = 12; // sentence length
-const int N = 100; // number of examples
-const int TR = 10; // number of training iterations
+const int W = 42; // vocabulary size
+const int L = 24; // sentence length
+const int N = 400; // number of examples
+const int TR = 20; // number of training iterations
 const int S = 10;
 //const double eta = 0.06; // step size for learning
 const double TAU = 100.0; // number of samples
@@ -224,7 +224,7 @@ void usrfun ( int *mode,  int *nnObj, int *nnCon,
   //double MULT = 4.0;
   *fObj   =  Objective; // + MULT * (log(max(TAU, Constraint)) - log(TAU));
   fCon[0] = log(Constraint);
-  cout << "Constraint: " << fCon[0] << " vs " << log(TAU) << endl;
+  //cout << "Constraint: " << fCon[0] << " vs " << log(TAU) << endl;
 
   if ( *mode == 0 || *mode == 2 ) {
     // we already updated fObj
@@ -296,7 +296,7 @@ int main(){
   double *rc = new double[n+m];
   int    *hs = new    int[n+m];
   
-  int    iObj    = 0;
+  int    iObj    = -1;
   double ObjAdd  = 0;
 
   for(int i = 0; i <= n; i++){
@@ -446,12 +446,11 @@ int main(){
     prob.setIntParameter( "Verify level", 0 );
     prob.setIntParameter( "Derivative option", 3 );
     
-    prob.solve          ( Cold );
-    //prob.solve          ( Warm );
+    //prob.solve          ( Cold );
+    prob.solve          ( Warm );
     //prob.solve          ( Warm );
 
     for(int i = 0; i < n; i++) theta[i] = w[i];
-    cout << "Slack: " << w[n] << endl;
 
     cout << "Printing params..." << endl;
     cout << "THETA:" << endl;
