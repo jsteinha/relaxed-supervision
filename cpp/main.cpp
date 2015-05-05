@@ -18,9 +18,8 @@ const int W = 102; // vocabulary size
 const int L = 36; // sentence length
 const int N = 1200; // number of examples
 const int TR = 50; // number of training iterations
-const int S = 20;
-//const double eta = 0.06; // step size for learning
-const double TAU = 200.0; // number of samples
+const int S = 20; // number of samples
+const double TAU = 200.0; // number of rejections per samples
 
 typedef vector<int> X;
 typedef multiset<int> Y;
@@ -63,7 +62,6 @@ int to_int(B b){
   return W*W + b;
 }
 
-//map<int,double> theta;
 vector<double> theta(W*W+W);
 
 double lse(double a, double b){
@@ -93,7 +91,6 @@ set<int> diff(const Y &y1, const Y &y2){
   Y::const_iterator it1 = y1.begin(), end1 = y1.end();
   Y::const_iterator it2 = y2.begin(), end2 = y2.end();
   while(it1 != end1 || it2 != end2){
-    //cout << "y1 " << (*y1) << " y2 " << (*y2) << endl;
     if(it1 == end1){
       ret.insert(*it2);
       it2 = y2.upper_bound(*it2);
@@ -128,7 +125,6 @@ double compute_cost(const Z &z, const Y &y){
   for(set<int>::iterator yi = ydiff.begin(); yi != ydiff.end(); ++yi){
     cost += theta[to_int(*yi)];
   }
-  //cout << "cost: " << cost << endl;
   return cost;
 }
 
@@ -145,7 +141,6 @@ Z sample(const X &x, const Y &y, double *logZ){
     double cost = compute_cost(z, y);
     *logZ = lse(*logZ, -cost);
     if(rand() < exp(-cost) * RAND_MAX){
-      //cout << num_samples << " samples" << endl;
       *logZ = (*logZ) - log(num_samples);
       sample_num += num_samples;
       sample_denom += 1;
@@ -173,12 +168,14 @@ void usrfun ( int *mode,  int *nnObj, int *nnCon,
 {
   double Objective = 0.0;
   
+  /*
   // create regularizer
   double lambda = 0.0; //L/(W * sqrt(N));
   for(int i = 0; i < W*W; i++){
     Objective += lambda * w[i] * w[i];
     gObj[i] = 2 * lambda * w[i];
   }
+  */
   
   // initialize other values
   vector<double> logC(W*W+W); // log of constraint
@@ -222,22 +219,16 @@ void usrfun ( int *mode,  int *nnObj, int *nnCon,
     }
   }
 
-  //cout << "Objective: " << Objective << endl;
-  //cout << "Constraint: " << Constraint << endl;
-
-  //Constraint = 0.0;
-  //double MULT = 4.0;
-  *fObj   =  Objective; // + MULT * (log(max(TAU, Constraint)) - log(TAU));
+  *fObj   =  Objective;
   fCon[0] = log(Constraint);
-  //cout << "Constraint: " << fCon[0] << " vs " << log(TAU) << endl;
 
   if ( *mode == 0 || *mode == 2 ) {
     // we already updated fObj
   }
 
   if ( *mode == 1 || *mode == 2 ) {
-    for(int i = 0; i < W*W+W; i++) gCon[i] = 0.0;
     // compute gradient of constraint; only do this if necessary
+    for(int i = 0; i < W*W+W; i++) gCon[i] = 0.0;
     for(int n = 0; n < N; n++){
       double wt = exp(logC[n]) / (N * Constraint);
       for(auto p : A_vec[n]){
@@ -257,26 +248,6 @@ void usrfun ( int *mode,  int *nnObj, int *nnCon,
   }
 
 }
-
-void constraint ( int *mode,  int *nnCon, int *nnJac, int *negCon,
-         double x[], double fCon[], double gCon[], int *nState,
-         char    *cu, int *lencu,
-         int    iu[], int *leniu,
-         double ru[], int *lenru )
-{
-
-  if ( *mode == 0 || *mode == 2 ) {
-    // no actual constraints
-    fCon[0] =  0;
-  }
-
-  if ( *mode == 1 || *mode == 2 ) {
-    // no actual constraints
-  }
-
-}
-
-
 
 int main(){
   static_assert(std::numeric_limits<float>::is_iec559, "IEEE 754 required");
@@ -336,7 +307,6 @@ int main(){
 
 
   cout << "Generating examples..." << endl;
-  //vector<example> examples;
   for(int i = 0; i < N; i++){
     examples.push_back(make_example_con());
   }
@@ -372,49 +342,20 @@ int main(){
         u_cur.insert(*yj);
       }
 
-      //cout << "Printing example..." << endl;
-      //cout << ex.x << endl;
-      //cout << ex.y << endl;
       // generate S samples
-      //cout << "Generating samples..." << endl;
       vector<Z> zs;
       double logZ = 0.0, logZcur;
-      //double logZ = -INFINITY, logZcur;
       for(int s = 0; s < S; s++){
         zs.push_back(sample(ex.x, ex.y, &logZcur));
         logZ += logZcur / S;
-        //logZ = lse(logZ, logZcur);
-        //cout << "z: " << zs[s] << endl;
       }
-      //logZ -= log(S);
       c_cur -= logZ;
-      //cout << "Updating gradient..." << endl;
-      // for now, just do gradient on log-likelihood
-      // theta: +sum of theta values in samples, -sum of average theta
-      // beta:  -sum of diffs in samples, + (L-1)exp(-beta)/(1+(L-1)exp(-beta))
-      /*
-      for(int y : u_cur){
-        double& beta = theta[to_int(y)];
-        beta += eta * (L-1)*exp(-beta)/(1+(L-1)*exp(-beta));
-      }
-      for(int x : ex.x){
-        double logZ = -INFINITY;
-        for(int y = 0; y < W; y++){
-          logZ = lse(logZ, theta[to_int(T(x,y))]);
-        }
-        for(int y = 0; y < W; y++){
-          double &th = theta[to_int(T(x,y))];
-          th -= eta * exp(th - logZ);
-        }
-      }
-      */
       for(int s = 0; s < S; s++){
         for(int j = 0; j < L; j++){
           int index = to_int(T(ex.x[j], zs[s][j]));
           double val = 1.0/S;
           A_cur.push_back(pair<int,double>(index, val));
           c_cur += theta[index] * val;
-          //theta[to_int(T(ex.x[j], zs[s][j]))] += eta/S;
         }
         set<int> ydiff = diff(ex.y, z2y(zs[s]));
         for(int y : ydiff){
@@ -422,7 +363,6 @@ int main(){
           double val = -1.0/S;
           A_cur.push_back(pair<int,double>(index, val));
           c_cur += theta[index] * val;
-          //theta[to_int(y)] -= eta/S;
         }
       }
       for(int x : ex.x){
@@ -449,17 +389,13 @@ int main(){
     prob.setJ           ( ne, valJ, indJ, locJ );
     prob.setX           ( bl, bu, w, pi, rc, hs );
     
-    //prob.setFunobj      ( objective );
-    //prob.setFuncon      ( constraint );
     prob.setUserFun     ( usrfun );
     
     prob.setSpecsFile   ( "prob.spc" );
     prob.setIntParameter( "Verify level", 0 );
     prob.setIntParameter( "Derivative option", 3 );
     
-    //prob.solve          ( Cold );
     prob.solve          ( Warm );
-    //prob.solve          ( Warm );
 
     for(int i = 0; i < n; i++) theta[i] = w[i];
 
@@ -480,12 +416,6 @@ int main(){
     for(int y = 0; y < W; y++) printf("%.2f ", theta[to_int(y)]);
     printf("\n");
     printf("Trace: %.2f\n\n", trace);
-
-    //cout << "Cleaning up..." << endl;
-    //delete []indJ;  delete []locJ; delete []valJ;
-
-    //delete []w;     delete []bl;   delete []bu;
-    //delete []pi;    delete []rc;   delete []hs;
 
   }
 
