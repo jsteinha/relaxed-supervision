@@ -14,9 +14,9 @@
 
 using namespace std;
 
-const int W = 15; // vocabulary size
-const int L = 8; // sentence length
-const int N = 50; // number of examples
+const int W = 42; // vocabulary size
+const int L = 24; // sentence length
+const int N = 400; // number of examples
 const int TR = 10; // number of training iterations
 const int S = 10;
 //const double eta = 0.06; // step size for learning
@@ -63,7 +63,8 @@ int to_int(B b){
   return W*W + b;
 }
 
-map<int,double> theta;
+//map<int,double> theta;
+vector<double> theta(W*W+W);
 
 double lse(double a, double b){
   if(a < b) return b + log(1 + exp(a-b));
@@ -143,7 +144,7 @@ Z sample(const X &x, const Y &y, double *logZ){
     double cost = compute_cost(z, y);
     *logZ = lse(*logZ, -cost);
     if(rand() < exp(-cost) * RAND_MAX){
-      cout << num_samples << " samples" << endl;
+      //cout << num_samples << " samples" << endl;
       *logZ = (*logZ) - log(num_samples);
       return z;
     }
@@ -165,7 +166,8 @@ void objective ( int *mode,  int *nnObj, double w[],
          int    iu[], int *leniu,
          double ru[], int *lenru )
 {
-  double lambda = L/(W * sqrt(N));
+  //cout << w[0] << " " << w[1] << " " << w[W+1] << " " << w[W*W + 1] << endl;
+  double lambda = 0.0; //L/(W * sqrt(N));
   double Objective = 0.0;
   // create regularizer
   for(int i = 0; i < W*W; i++){
@@ -214,8 +216,11 @@ void objective ( int *mode,  int *nnObj, double w[],
     }
   }
 
+  //cout << "Objective: " << Objective << endl;
+  //cout << "Constraint: " << Constraint << endl;
 
-  *fObj   =  Objective + max(TAU, log(Constraint));
+  //Constraint = 0.0;
+  *fObj   =  Objective + log(max(TAU, Constraint)) - log(TAU);
 
   if ( *mode == 0 || *mode == 2 ) {
     // we already updated fObj
@@ -226,7 +231,7 @@ void objective ( int *mode,  int *nnObj, double w[],
     if(Constraint >= TAU){
       // need to update gradient to take into account constraint term
       for(int n = 0; n < N; n++){
-        double wt = exp(logC[n]) / Constraint;
+        double wt = exp(logC[n]) / (N * Constraint);
         for(auto p : A_vec[n]){
           gObj[p.first] -= p.second * wt;
         }
@@ -300,20 +305,20 @@ int main(){
         u_cur.insert(*yj);
       }
 
-      cout << "Printing example..." << endl;
-      cout << ex.x << endl;
-      cout << ex.y << endl;
+      //cout << "Printing example..." << endl;
+      //cout << ex.x << endl;
+      //cout << ex.y << endl;
       // generate S samples
-      cout << "Generating samples..." << endl;
+      //cout << "Generating samples..." << endl;
       vector<Z> zs;
       double logZ = 0.0, logZcur;
       for(int s = 0; s < S; s++){
         zs.push_back(sample(ex.x, ex.y, &logZcur));
         logZ += logZcur / S;
-        cout << "z: " << zs[s] << endl;
+        //cout << "z: " << zs[s] << endl;
       }
       c_cur -= logZ;
-      cout << "Updating gradient..." << endl;
+      //cout << "Updating gradient..." << endl;
       // for now, just do gradient on log-likelihood
       // theta: +sum of theta values in samples, -sum of average theta
       // beta:  -sum of diffs in samples, + (L-1)exp(-beta)/(1+(L-1)exp(-beta))
@@ -349,6 +354,13 @@ int main(){
           c_cur += theta[index] * val;
           //theta[to_int(y)] -= eta/S;
         }
+      }
+      for(int x : ex.x){
+        double logZ = -INFINITY;
+        for(int y : u_cur){
+          logZ = lse(logZ, theta[to_int(T(x,y))]);
+        }
+        c_cur -= logZ;
       }
       c_vec.push_back(c_cur);
       A_vec.push_back(A_cur);
@@ -398,7 +410,8 @@ int main(){
       pi[i] = 0;
     }
 
-    for(int i = W*W; i < W*W+W; i++) w[i] = 1.0/L;
+    for(int i=0;i<n;i++) w[i]=theta[i];
+    //for(int i = W*W; i < W*W+W; i++) w[i] = 1.0/L;
 
     valJ[0] = indJ[0] = 0;
     locJ[0] = 0;
@@ -414,13 +427,14 @@ int main(){
     prob.setFunobj      ( objective );
     prob.setFuncon      ( constraint );
     
-    prob.setSpecsFile   ( "sntoy.spc" );
+    prob.setSpecsFile   ( "prob.spc" );
     prob.setIntParameter( "Verify level", 3 );
     prob.setIntParameter( "Derivative option", 3 );
     
     prob.solve          ( Cold );
+    //prob.solve          ( Warm );
 
-    exit(0);
+    for(int i = 0; i < n; i++) theta[i] = w[i];
 
     cout << "Printing params..." << endl;
     cout << "THETA:" << endl;
