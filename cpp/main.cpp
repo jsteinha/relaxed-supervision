@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <algorithm>
+#include <thread>
 #include <map>
 #include <vector>
 #include <set>
@@ -151,39 +152,33 @@ Z sample(const X &x, const Y &y, double *logZ){
 
 // declare some structures that will be useful for the optimization
 typedef vector<pair<int,double>> LIN;
-vector<double>   c_vec;
-vector<LIN>      A_vec;
-vector<set<int>> u_vec;
-vector<int>      xtot;
+vector<double>      c_vec;
+vector<LIN>         A_vec;
+vector<vector<int>> u_vec;
+vector<int>         xtot;
 
 vector<example> examples;
 
-void usrfun ( int *mode,  int *nnObj, int *nnCon,
-     int *nnJac, int *nnL,   int *negCon, double w[],
-     double *fObj,  double gObj[],
-     double fCon[], double gCon[], int *Status,
-     char    *cu, int *lencu,
-     int    iu[], int *leniu,
-     double ru[], int *lenru )
-{
-  double Objective = 0.0;
-  
-  /*
-  // create regularizer
-  double lambda = 0.0; //L/(W * sqrt(N));
-  for(int i = 0; i < W*W; i++){
-    Objective += lambda * w[i] * w[i];
-    gObj[i] = 2 * lambda * w[i];
-  }
-  */
-  
-  // initialize other values
-  vector<double> logC(W*W+W); // log of constraint
-  for(int i = W*W; i < W*W + W; i++) gObj[i] = 0;
+const int numThreads = 4;
+const int dim = W*W+W;
+double fObjParts[numThreads];
+double gObjParts[numThreads][dim];
+double fConParts[numThreads];
+double gConParts[numThreads][dim];
 
-  double Constraint = 0.0;
+void process_part(int index, int start, int end, double w[]){
+  // initialize other values
+  vector<double> logC(end-start); // log of constraint
+  double* gObj = gObjParts[index];
+  double* gCon = gConParts[index];
+
+  for(int i = 0; i < dim; i++) gObj[i] = 0.0;
+  for(int i = 0; i < dim; i++) gCon[i] = 0.0;
+
+  double Objective = 0.0, Constraint = 0.0;
+
   // loop through examples
-  for(int n = 0; n < N; n++){
+  for(int n = start; n < end; n++){
     Objective += c_vec[n] / N;
     double logConstraint = c_vec[n];
     for(auto p : A_vec[n]){
@@ -198,16 +193,36 @@ void usrfun ( int *mode,  int *nnObj, int *nnCon,
       }
       logConstraint += logZ;
     }
-    logC[n] = logConstraint;
+    logC[n-start] = logConstraint;
     Constraint += exp(logConstraint) / N;
   }
-  // add additional terms that we accumulated over examples
-  for(int i = 0; i < W; i++){
-    double beta = w[to_int(i)];
-    Objective += log(1 + (L-1) * exp(-beta));
-    gObj[to_int(i)] -= (L-1) / (exp(beta) + (L-1));
+
+  //*fObj   =  Objective;
+  //fCon[0] = log(Constraint);
+  fObjParts[index] = Objective;
+  fConParts[index] = Constraint;
+
+  // compute gradient of constraint
+  for(int n = start; n < end; n++){
+    double wt = exp(logC[n-start]) / (N * Constraint);
+    for(auto p : A_vec[n]){
+      gCon[p.first] -= p.second * wt;
+    }
+    for(int x : examples[n].x){
+      double logZ = -INFINITY;
+      for(int u : u_vec[n]){
+        logZ = lse(logZ, w[to_int(T(x,u))]);
+      }
+      for(int u : u_vec[n]){
+        gCon[to_int(T(x,u))] += exp(w[to_int(T(x,u))]-logZ) * wt;
+      }
+    }
   }
-  for(int x = 0; x < W; x++){
+}
+
+void process_words(int index, int start, int end, double gObj[], double w[]){
+  double Objective = 0.0;
+  for(int x = start; x < end; x++){
     double logZ = -INFINITY;
     for(int y = 0; y < W; y++){
       logZ = lse(logZ, w[to_int(T(x,y))]);
@@ -218,34 +233,77 @@ void usrfun ( int *mode,  int *nnObj, int *nnCon,
       gObj[to_int(T(x,y))] += xtot[x] * exp(theta - logZ) / N;
     }
   }
+  fObjParts[index] = Objective;
+}
 
-  *fObj   =  Objective;
-  fCon[0] = log(Constraint);
-
-  if ( *mode == 0 || *mode == 2 ) {
-    // we already updated fObj
+void usrfun ( int *mode,  int *nnObj, int *nnCon,
+     int *nnJac, int *nnL,   int *negCon, double w[],
+     double *fObj,  double gObj[],
+     double fCon[], double gCon[], int *Status,
+     char    *cu, int *lencu,
+     int    iu[], int *leniu,
+     double ru[], int *lenru )
+{
+  double Objective = 0.0, Constraint = 0.0;
+  
+  /*
+  // create regularizer
+  double lambda = 0.0; //L/(W * sqrt(N));
+  for(int i = 0; i < W*W; i++){
+    Objective += lambda * w[i] * w[i];
+    gObj[i] = 2 * lambda * w[i];
+  }
+  */
+  
+  // create blocks for each thread
+  // thread i has [blocks[i], blocks[i+1])
+  vector<thread> threads;
+  for(int i = 0; i < numThreads; i++){
+    int start = (N * i) / numThreads,
+        end = (N * (i+1)) / numThreads;
+    threads.push_back(thread(process_part, i, start, end, w));
+  }
+  for(auto &thread : threads){
+    thread.join();
   }
 
-  if ( *mode == 1 || *mode == 2 ) {
-    // compute gradient of constraint; only do this if necessary
-    for(int i = 0; i < W*W+W; i++) gCon[i] = 0.0;
-    for(int n = 0; n < N; n++){
-      double wt = exp(logC[n]) / (N * Constraint);
-      for(auto p : A_vec[n]){
-        gCon[p.first] -= p.second * wt;
-      }
-      for(int x : examples[n].x){
-        double logZ = -INFINITY;
-        for(int u : u_vec[n]){
-          logZ = lse(logZ, w[to_int(T(x,u))]);
-        }
-        for(int u : u_vec[n]){
-          gCon[to_int(T(x,u))] += exp(w[to_int(T(x,u))]-logZ) * wt;
-        }
-      }
+  for(int i = 0; i < dim; i++){
+    gObj[i] = gCon[i] = 0.0;
+  }
+  for(int t = 0; t < numThreads; t++){
+    Objective += fObjParts[t];
+    Constraint += fConParts[t];
+  }
+  for(int t = 0; t < numThreads; t++){
+    double ratio = fConParts[t] / Constraint;
+    for(int i = 0; i < dim; i++){
+      gObj[i] += gObjParts[t][i];
+      gCon[i] += ratio * gConParts[t][i];
     }
-    
   }
+
+  // add additional terms that we accumulated over examples
+  // this should be multi-threaded; fortunately it is threadsafe
+  threads.clear();
+  for(int i = 0; i < numThreads; i++){
+    int start = (W * i) / numThreads,
+        end = (W * (i+1)) / numThreads;
+    threads.push_back(thread(process_words, i, start, end, gObj, w));
+  }
+  for(auto &thread : threads) thread.join();
+  for(int t = 0; t < numThreads; t++){
+    Objective += fObjParts[t];
+  }
+  // this can be single-threaded
+  for(int i = 0; i < W; i++){
+    double beta = w[to_int(i)];
+    Objective += log(1 + (L-1) * exp(-beta));
+    gObj[to_int(i)] -= (L-1) / (exp(beta) + (L-1));
+  }
+
+
+  *fObj = Objective;
+  fCon[0] = log(Constraint);
 
 }
 
@@ -372,9 +430,13 @@ int main(){
         }
         c_cur -= logZ;
       }
+
       c_vec.push_back(c_cur);
+      // sorting (maybe) improves cache efficiency
+      sort(A_cur.begin(), A_cur.end());
       A_vec.push_back(A_cur);
-      u_vec.push_back(u_cur);
+      // convert from set to vector for efficiency
+      u_vec.push_back(vector<int>(u_cur.begin(), u_cur.end()));
     }
 
     printf("Average number of samples: %.2f\n", sample_num / (double) sample_denom);
@@ -395,7 +457,8 @@ int main(){
     prob.setIntParameter( "Verify level", 0 );
     prob.setIntParameter( "Derivative option", 3 );
     
-    prob.solve          ( Warm );
+    if(t == 0) prob.solve( Cold );
+    else       prob.solve( Warm );
 
     for(int i = 0; i < n; i++) theta[i] = w[i];
 
