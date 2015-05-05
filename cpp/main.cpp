@@ -217,10 +217,11 @@ void objective ( int *mode,  int *nnObj, double w[],
   }
 
   //cout << "Objective: " << Objective << endl;
-  //cout << "Constraint: " << Constraint << endl;
+  cout << "Constraint: " << Constraint << endl;
 
   //Constraint = 0.0;
-  *fObj   =  Objective + log(max(TAU, Constraint)) - log(TAU);
+  double MULT = 4.0;
+  *fObj   =  Objective + MULT * (log(max(TAU, Constraint)) - log(TAU));
 
   if ( *mode == 0 || *mode == 2 ) {
     // we already updated fObj
@@ -231,7 +232,7 @@ void objective ( int *mode,  int *nnObj, double w[],
     if(Constraint >= TAU){
       // need to update gradient to take into account constraint term
       for(int n = 0; n < N; n++){
-        double wt = exp(logC[n]) / (N * Constraint);
+        double wt = MULT * exp(logC[n]) / (N * Constraint);
         for(auto p : A_vec[n]){
           gObj[p.first] -= p.second * wt;
         }
@@ -285,6 +286,7 @@ int main(){
     theta[to_int(i)] = 1.0/L;
   }
   for(int t = 0; t < TR; t++){
+    cout << "Beginning iteration " << (t+1) << endl;
     // initialize optimization structures
     c_vec.clear();
     A_vec.clear();
@@ -293,7 +295,9 @@ int main(){
     xtot = vector<int>(W);
 
     // for each example
+    int ex_num = 0;
     for(example ex : examples){
+      if((++ex_num) % 25 == 0) cout << ex_num << " examples" << endl;
       // create c, A, u
       double c_cur = 0.0;
       LIN A_cur;
@@ -428,7 +432,7 @@ int main(){
     prob.setFuncon      ( constraint );
     
     prob.setSpecsFile   ( "prob.spc" );
-    prob.setIntParameter( "Verify level", 3 );
+    prob.setIntParameter( "Verify level", 0 );
     prob.setIntParameter( "Derivative option", 3 );
     
     prob.solve          ( Cold );
