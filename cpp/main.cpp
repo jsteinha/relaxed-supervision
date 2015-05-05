@@ -14,11 +14,11 @@
 
 using namespace std;
 
-const int W = 42; // vocabulary size
-const int L = 24; // sentence length
-const int N = 400; // number of examples
-const int TR = 30; // number of training iterations
-const int S = 10;
+const int W = 102; // vocabulary size
+const int L = 36; // sentence length
+const int N = 1200; // number of examples
+const int TR = 50; // number of training iterations
+const int S = 20;
 //const double eta = 0.06; // step size for learning
 const double TAU = 200.0; // number of samples
 
