@@ -14,7 +14,7 @@
 
 using namespace std;
 
-const int W = 84; // vocabulary size
+const int W = 42; // vocabulary size
 const int L = 24; // sentence length
 const int N = 400; // number of examples
 const int TR = 30; // number of training iterations
@@ -172,14 +172,14 @@ void usrfun ( int *mode,  int *nnObj, int *nnCon,
      double ru[], int *lenru )
 {
   double Objective = 0.0;
-  /*
+  
   // create regularizer
-  double lambda = L/(W * sqrt(N));
+  double lambda = 0.0; //L/(W * sqrt(N));
   for(int i = 0; i < W*W; i++){
     Objective += lambda * w[i] * w[i];
     gObj[i] = 2 * lambda * w[i];
   }
-  */
+  
   // initialize other values
   vector<double> logC(W*W+W); // log of constraint
   for(int i = W*W; i < W*W + W; i++) gObj[i] = 0;
