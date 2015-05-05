@@ -14,13 +14,13 @@
 
 using namespace std;
 
-const int W = 42; // vocabulary size
+const int W = 84; // vocabulary size
 const int L = 24; // sentence length
 const int N = 400; // number of examples
-const int TR = 20; // number of training iterations
+const int TR = 30; // number of training iterations
 const int S = 10;
 //const double eta = 0.06; // step size for learning
-const double TAU = 100.0; // number of samples
+const double TAU = 200.0; // number of samples
 
 typedef vector<int> X;
 typedef multiset<int> Y;
@@ -132,6 +132,7 @@ double compute_cost(const Z &z, const Y &y){
   return cost;
 }
 
+int sample_num = 0, sample_denom = 0;
 Z sample(const X &x, const Y &y, double *logZ){
   int num_samples = 0;
   *logZ = -INFINITY;
@@ -146,6 +147,8 @@ Z sample(const X &x, const Y &y, double *logZ){
     if(rand() < exp(-cost) * RAND_MAX){
       //cout << num_samples << " samples" << endl;
       *logZ = (*logZ) - log(num_samples);
+      sample_num += num_samples;
+      sample_denom += 1;
       return z;
     }
   }
@@ -168,13 +171,15 @@ void usrfun ( int *mode,  int *nnObj, int *nnCon,
      int    iu[], int *leniu,
      double ru[], int *lenru )
 {
-  double lambda = 0.0; //L/(W * sqrt(N));
   double Objective = 0.0;
+  /*
   // create regularizer
+  double lambda = L/(W * sqrt(N));
   for(int i = 0; i < W*W; i++){
     Objective += lambda * w[i] * w[i];
     gObj[i] = 2 * lambda * w[i];
   }
+  */
   // initialize other values
   vector<double> logC(W*W+W); // log of constraint
   for(int i = W*W; i < W*W + W; i++) gObj[i] = 0;
@@ -343,6 +348,7 @@ int main(){
     theta[to_int(i)] = 1.0/L;
   }
   for(int t = 0; t < TR; t++){
+    sample_num = sample_denom = 0;
     cout << "Beginning iteration " << (t+1) << endl;
     // initialize optimization structures
     c_vec.clear();
@@ -373,11 +379,14 @@ int main(){
       //cout << "Generating samples..." << endl;
       vector<Z> zs;
       double logZ = 0.0, logZcur;
+      //double logZ = -INFINITY, logZcur;
       for(int s = 0; s < S; s++){
         zs.push_back(sample(ex.x, ex.y, &logZcur));
         logZ += logZcur / S;
+        //logZ = lse(logZ, logZcur);
         //cout << "z: " << zs[s] << endl;
       }
+      //logZ -= log(S);
       c_cur -= logZ;
       //cout << "Updating gradient..." << endl;
       // for now, just do gradient on log-likelihood
@@ -428,6 +437,8 @@ int main(){
       u_vec.push_back(u_cur);
     }
 
+    printf("Average number of samples: %.2f\n", sample_num / (double) sample_denom);
+
     cout << "Building SNOPT problem..." << endl;
     snoptProblemC prob("the_optimization");
 
@@ -454,15 +465,21 @@ int main(){
 
     cout << "Printing params..." << endl;
     cout << "THETA:" << endl;
+    double trace = 0.0;
     for(int x = 0; x < W; x++){
       double logZ = -INFINITY;
       for(int y = 0; y < W; y++) logZ = lse(logZ, theta[to_int(T(x,y))]);
-      for(int y = 0; y < W; y++) printf("%.2f ", exp(theta[to_int(T(x,y))]-logZ));
+      for(int y = 0; y < W; y++){
+        double prob = exp(theta[to_int(T(x,y))]-logZ);
+        printf("%.2f ", prob);
+        if(x == y) trace += prob;
+      }
       printf("\n");
     }
     cout << "BETA:" << endl;
     for(int y = 0; y < W; y++) printf("%.2f ", theta[to_int(y)]);
     printf("\n");
+    printf("Trace: %.2f\n\n", trace);
 
     //cout << "Cleaning up..." << endl;
     //delete []indJ;  delete []locJ; delete []valJ;
