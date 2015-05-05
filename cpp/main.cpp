@@ -14,9 +14,9 @@
 
 using namespace std;
 
-const int W = 42; // vocabulary size
-const int L = 24; // sentence length
-const int N = 400; // number of examples
+const int W = 21; // vocabulary size
+const int L = 12; // sentence length
+const int N = 100; // number of examples
 const int TR = 10; // number of training iterations
 const int S = 10;
 //const double eta = 0.06; // step size for learning
@@ -160,13 +160,14 @@ vector<int>      xtot;
 
 vector<example> examples;
 
-void objective ( int *mode,  int *nnObj, double w[],
-         double *fObj,  double gObj[], int *nState,
-         char    *cu, int *lencu,
-         int    iu[], int *leniu,
-         double ru[], int *lenru )
+void usrfun ( int *mode,  int *nnObj, int *nnCon,
+     int *nnJac, int *nnL,   int *negCon, double w[],
+     double *fObj,  double gObj[],
+     double fCon[], double gCon[], int *Status,
+     char    *cu, int *lencu,
+     int    iu[], int *leniu,
+     double ru[], int *lenru )
 {
-  //cout << w[0] << " " << w[1] << " " << w[W+1] << " " << w[W*W + 1] << endl;
   double lambda = 0.0; //L/(W * sqrt(N));
   double Objective = 0.0;
   // create regularizer
@@ -217,36 +218,37 @@ void objective ( int *mode,  int *nnObj, double w[],
   }
 
   //cout << "Objective: " << Objective << endl;
-  cout << "Constraint: " << Constraint << endl;
+  //cout << "Constraint: " << Constraint << endl;
 
   //Constraint = 0.0;
-  double MULT = 4.0;
-  *fObj   =  Objective + MULT * (log(max(TAU, Constraint)) - log(TAU));
+  //double MULT = 4.0;
+  *fObj   =  Objective; // + MULT * (log(max(TAU, Constraint)) - log(TAU));
+  fCon[0] = log(Constraint);
+  cout << "Constraint: " << fCon[0] << " vs " << log(TAU) << endl;
 
   if ( *mode == 0 || *mode == 2 ) {
     // we already updated fObj
   }
 
   if ( *mode == 1 || *mode == 2 ) {
-    // only do this if necessary
-    if(Constraint >= TAU){
-      // need to update gradient to take into account constraint term
-      for(int n = 0; n < N; n++){
-        double wt = MULT * exp(logC[n]) / (N * Constraint);
-        for(auto p : A_vec[n]){
-          gObj[p.first] -= p.second * wt;
+    for(int i = 0; i < W*W+W; i++) gCon[i] = 0.0;
+    // compute gradient of constraint; only do this if necessary
+    for(int n = 0; n < N; n++){
+      double wt = exp(logC[n]) / (N * Constraint);
+      for(auto p : A_vec[n]){
+        gCon[p.first] -= p.second * wt;
+      }
+      for(int x : examples[n].x){
+        double logZ = -INFINITY;
+        for(int u : u_vec[n]){
+          logZ = lse(logZ, w[to_int(T(x,u))]);
         }
-        for(int x : examples[n].x){
-          double logZ = -INFINITY;
-          for(int u : u_vec[n]){
-            logZ = lse(logZ, w[to_int(T(x,u))]);
-          }
-          for(int u : u_vec[n]){
-            gObj[to_int(T(x,u))] += exp(w[to_int(T(x,u))]-logZ) * wt;
-          }
+        for(int u : u_vec[n]){
+          gCon[to_int(T(x,u))] += exp(w[to_int(T(x,u))]-logZ) * wt;
         }
       }
     }
+    
   }
 
 }
@@ -273,6 +275,61 @@ void constraint ( int *mode,  int *nnCon, int *nnJac, int *negCon,
 
 int main(){
   static_assert(std::numeric_limits<float>::is_iec559, "IEEE 754 required");
+
+  /* Begin SNOPT initialization */
+  cout << "Initializing SNOPT structures..." << endl;
+  int n = W*W + W;
+  int m = 1;
+  int ne = n;
+  int nnCon = 1;
+  int nnObj = n;
+  int nnJac = n;
+
+  int    *indJ = new int[ne];
+  int    *locJ = new int[n+1];
+  double *valJ = new double[ne];
+  
+  double *w  = new double[n+m];
+  double *bl = new double[n+m];
+  double *bu = new double[n+m];
+  double *pi = new double[m];
+  double *rc = new double[n+m];
+  int    *hs = new    int[n+m];
+  
+  int    iObj    = 0;
+  double ObjAdd  = 0;
+
+  for(int i = 0; i <= n; i++){
+    locJ[i] = i;
+    if(i < n){
+      indJ[i] = 0;
+      valJ[i] = 0.0;
+    }
+  }
+
+  int Cold = 0, Basis = 1, Warm = 2;
+
+  for(int i = 0; i < W*W; i++){
+    bl[i] = -5; bu[i] = 5;
+  }
+  for(int i = W*W; i < W*W + W; i++){
+    bl[i] = 1.0/L; bu[i] = 5;
+  }
+  bl[n] = -1.1e20; bu[n] = log(TAU);
+  cout << "bu[" << n << "] = " << bu[n] << endl;
+
+  for ( int i = 0; i < n+m; i++ ) {
+    hs[i] = 0;
+     w[i] = 0;
+    rc[i] = 0;
+  }
+
+  for ( int i = 0; i < m; i++ ) {
+    pi[i] = 0;
+  }
+  /* End SNOPT initialization */
+
+
   cout << "Generating examples..." << endl;
   //vector<example> examples;
   for(int i = 0; i < N; i++){
@@ -372,64 +429,18 @@ int main(){
     }
 
     cout << "Building SNOPT problem..." << endl;
-    snoptProblemB prob("the_optimization");
-    int n = W*W + W;
-    int m = 1; // actually zero
-    int ne = 1;
-    int nnCon = 0;
-    int nnObj = n;
-    int nnJac = 0;
-
-    int    *indJ = new int[ne];
-    int    *locJ = new int[n+1];
-    double *valJ = new double[ne];
-  
-    double *w  = new double[n+m];
-    double *bl = new double[n+m];
-    double *bu = new double[n+m];
-    double *pi = new double[m];
-    double *rc = new double[n+m];
-    int    *hs = new    int[n+m];
-  
-    int    iObj    = 0;
-    double ObjAdd  = 0;
-
-    int Cold = 0, Basis = 1, Warm = 2;
-
-    for(int i = 0; i < W*W; i++){
-      bl[i] = -5; bu[i] = 5;
-    }
-    for(int i = W*W; i < W*W + W; i++){
-      bl[i] = 1.0/L; bu[i] = 5;
-    }
-    bl[n] = -5; bu[n] = 5;
-
-    for ( int i = 0; i < n+m; i++ ) {
-      hs[i] = 0;
-       w[i] = 0;
-      rc[i] = 0;
-    }
-
-    for ( int i = 0; i < m; i++ ) {
-      pi[i] = 0;
-    }
+    snoptProblemC prob("the_optimization");
 
     for(int i=0;i<n;i++) w[i]=theta[i];
-    //for(int i = W*W; i < W*W+W; i++) w[i] = 1.0/L;
-
-    valJ[0] = indJ[0] = 0;
-    locJ[0] = 0;
-    for(int i = 1; i <= n; i++){
-      locJ[i] = 1;
-    }
 
     prob.setProblemSize ( m, n, nnCon, nnJac, nnObj );
     prob.setObjective   ( iObj, ObjAdd );
     prob.setJ           ( ne, valJ, indJ, locJ );
     prob.setX           ( bl, bu, w, pi, rc, hs );
     
-    prob.setFunobj      ( objective );
-    prob.setFuncon      ( constraint );
+    //prob.setFunobj      ( objective );
+    //prob.setFuncon      ( constraint );
+    prob.setUserFun     ( usrfun );
     
     prob.setSpecsFile   ( "prob.spc" );
     prob.setIntParameter( "Verify level", 0 );
@@ -437,8 +448,10 @@ int main(){
     
     prob.solve          ( Cold );
     //prob.solve          ( Warm );
+    //prob.solve          ( Warm );
 
     for(int i = 0; i < n; i++) theta[i] = w[i];
+    cout << "Slack: " << w[n] << endl;
 
     cout << "Printing params..." << endl;
     cout << "THETA:" << endl;
@@ -451,6 +464,13 @@ int main(){
     cout << "BETA:" << endl;
     for(int y = 0; y < W; y++) printf("%.2f ", theta[to_int(y)]);
     printf("\n");
+
+    //cout << "Cleaning up..." << endl;
+    //delete []indJ;  delete []locJ; delete []valJ;
+
+    //delete []w;     delete []bl;   delete []bu;
+    //delete []pi;    delete []rc;   delete []hs;
+
   }
 
   return 0;
