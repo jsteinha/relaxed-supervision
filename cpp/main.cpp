@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <algorithm>
 #include <thread>
+#include <atomic>
 #include <map>
 #include <vector>
 #include <set>
@@ -129,7 +130,7 @@ double compute_cost(const Z &z, const Y &y){
   return cost;
 }
 
-int sample_num = 0, sample_denom = 0;
+atomic<int> sample_num(0), sample_denom(0);
 Z sample(const X &x, const Y &y, double *logZ){
   int num_samples = 0;
   *logZ = -INFINITY;
@@ -152,10 +153,14 @@ Z sample(const X &x, const Y &y, double *logZ){
 
 // declare some structures that will be useful for the optimization
 typedef vector<pair<int,double>> LIN;
-vector<double>      c_vec;
-vector<LIN>         A_vec;
-vector<vector<int>> u_vec;
-vector<int>         xtot;
+//vector<double>      c_vec;
+//vector<LIN>         A_vec;
+//vector<vector<int>> u_vec;
+//vector<int>         xtot;
+double c_vec[N];
+LIN A_vec[N];
+vector<int> u_vec[N];
+int xtot[W];
 
 vector<example> examples;
 
@@ -307,6 +312,64 @@ void usrfun ( int *mode,  int *nnObj, int *nnCon,
 
 }
 
+void process_examples(int start, int end){
+
+    for(int ex_num = start; ex_num < end; ex_num++){
+      if(ex_num % 25 == 0) cout << "example " << ex_num << endl;
+      example ex = examples[ex_num];
+      // create c, A, u
+      double c_cur = 0.0;
+      LIN A_cur;
+      set<int> u_cur;
+      // update xtot -- NO LONGER NEEDED
+      //for(int x : ex.x) xtot[x]++;
+      // set u_cur
+      for(Y::iterator yj = ex.y.begin(); yj != ex.y.end(); yj = ex.y.upper_bound(*yj)){
+        u_cur.insert(*yj);
+      }
+
+      // generate S samples
+      vector<Z> zs;
+      double logZ = 0.0, logZcur;
+      for(int s = 0; s < S; s++){
+        zs.push_back(sample(ex.x, ex.y, &logZcur));
+        logZ += logZcur / S;
+      }
+      c_cur -= logZ;
+      for(int s = 0; s < S; s++){
+        for(int j = 0; j < L; j++){
+          int index = to_int(T(ex.x[j], zs[s][j]));
+          double val = 1.0/S;
+          A_cur.push_back(pair<int,double>(index, val));
+          c_cur += theta[index] * val;
+        }
+        set<int> ydiff = diff(ex.y, z2y(zs[s]));
+        for(int y : ydiff){
+          int index = to_int(y);
+          double val = -1.0/S;
+          A_cur.push_back(pair<int,double>(index, val));
+          c_cur += theta[index] * val;
+        }
+      }
+      for(int x : ex.x){
+        double logZ = -INFINITY;
+        for(int y : u_cur){
+          logZ = lse(logZ, theta[to_int(T(x,y))]);
+        }
+        c_cur -= logZ;
+      }
+
+      c_vec[ex_num] = c_cur;
+      // sorting (maybe) improves cache efficiency
+      sort(A_cur.begin(), A_cur.end());
+      A_vec[ex_num] = A_cur;
+      // convert from set to vector for efficiency
+      u_vec[ex_num] = vector<int>(u_cur.begin(), u_cur.end());
+    }
+
+
+}
+
 int main(){
   static_assert(std::numeric_limits<float>::is_iec559, "IEEE 754 required");
 
@@ -375,69 +438,26 @@ int main(){
   for(int i = 0; i < W; i++){
     theta[to_int(i)] = 1.0/L;
   }
+
+  cout << "Populating xtot..." << endl;
+  for(int x = 0; x < W; x++) xtot[x] = 0;
+  for(example ex: examples){
+    for(int x : ex.x) xtot[x]++;
+  }
+
   for(int t = 0; t < TR; t++){
     sample_num = sample_denom = 0;
     cout << "Beginning iteration " << (t+1) << endl;
     // initialize optimization structures
-    c_vec.clear();
-    A_vec.clear();
-    u_vec.clear();
-    xtot.clear();
-    xtot = vector<int>(W);
 
-    // for each example
-    int ex_num = 0;
-    for(example ex : examples){
-      if((++ex_num) % 25 == 0) cout << ex_num << " examples" << endl;
-      // create c, A, u
-      double c_cur = 0.0;
-      LIN A_cur;
-      set<int> u_cur;
-      // update xtot
-      for(int x : ex.x) xtot[x]++;
-      // set u_cur
-      for(Y::iterator yj = ex.y.begin(); yj != ex.y.end(); yj = ex.y.upper_bound(*yj)){
-        u_cur.insert(*yj);
-      }
-
-      // generate S samples
-      vector<Z> zs;
-      double logZ = 0.0, logZcur;
-      for(int s = 0; s < S; s++){
-        zs.push_back(sample(ex.x, ex.y, &logZcur));
-        logZ += logZcur / S;
-      }
-      c_cur -= logZ;
-      for(int s = 0; s < S; s++){
-        for(int j = 0; j < L; j++){
-          int index = to_int(T(ex.x[j], zs[s][j]));
-          double val = 1.0/S;
-          A_cur.push_back(pair<int,double>(index, val));
-          c_cur += theta[index] * val;
-        }
-        set<int> ydiff = diff(ex.y, z2y(zs[s]));
-        for(int y : ydiff){
-          int index = to_int(y);
-          double val = -1.0/S;
-          A_cur.push_back(pair<int,double>(index, val));
-          c_cur += theta[index] * val;
-        }
-      }
-      for(int x : ex.x){
-        double logZ = -INFINITY;
-        for(int y : u_cur){
-          logZ = lse(logZ, theta[to_int(T(x,y))]);
-        }
-        c_cur -= logZ;
-      }
-
-      c_vec.push_back(c_cur);
-      // sorting (maybe) improves cache efficiency
-      sort(A_cur.begin(), A_cur.end());
-      A_vec.push_back(A_cur);
-      // convert from set to vector for efficiency
-      u_vec.push_back(vector<int>(u_cur.begin(), u_cur.end()));
+    // launch threads for each segment of examples
+    vector<thread> threads;
+    for(int i = 0; i < numThreads; i++){
+      int start = (N * i) / numThreads,
+          end = (N * (i+1)) / numThreads;
+      threads.push_back(thread(process_examples, start, end));
     }
+    for(auto &th : threads) th.join();
 
     printf("Average number of samples: %.2f\n", sample_num / (double) sample_denom);
 
