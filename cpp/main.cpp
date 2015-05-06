@@ -76,7 +76,7 @@ int sample_once(int xi, const Y &y){
   for(Y::iterator yj = y.begin(); yj != y.end(); yj = y.upper_bound(*yj)){
     logZ = lse(logZ, theta[to_int(T(xi, *yj))]);
   }
-  double u = rand() / (double) RAND_MAX;
+  double u = rand() / (double) (RAND_MAX + 1);
   double cur = -INFINITY;
   for(Y::iterator yj = y.begin(); yj != y.end(); yj = y.upper_bound(*yj)){
     cur = lse(cur, theta[to_int(T(xi, *yj))]);
@@ -84,8 +84,8 @@ int sample_once(int xi, const Y &y){
       return (*yj);
     }
   }
-  cout << "UH OH" << endl;
-  assert(false);
+  cout << "UH OH " << u << " " << cur << " " << logZ << endl;
+  return *(y.begin()); // just do something
 }
 
 set<int> diff(const Y &y1, const Y &y2){
@@ -164,7 +164,7 @@ int xtot[W];
 
 vector<example> examples;
 
-const int numThreads = 4;
+const int numThreads = 6;
 const int dim = W*W+W;
 double fObjParts[numThreads];
 double gObjParts[numThreads][dim];
