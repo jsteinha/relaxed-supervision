@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <algorithm>
 #include <thread>
 #include <atomic>
@@ -22,6 +23,18 @@ const int N = 1200; // number of examples
 const int TR = 50; // number of training iterations
 const int S = 20; // number of samples
 const double TAU = 200.0; // number of rejections per samples
+
+const int DEFAULT = 0,
+          NO_CONSTRAINT = 1,
+          IMPORTANCE = 2;
+int algorithm = DEFAULT;
+bool fixed_beta = false;
+bool tied_beta = false;
+double beta_val;
+
+const int numThreads = 6;
+const int MAX_DIM = W*W+W;
+int theta_dim, beta_dim, dim; // = W*W+W;
 
 typedef vector<int> X;
 typedef multiset<int> Y;
@@ -61,10 +74,12 @@ int to_int(T t){
   return W*t.first + t.second;
 }
 int to_int(B b){
-  return W*W + b;
+  if(tied_beta) return theta_dim;
+  else return theta_dim + b;
 }
 
-vector<double> theta(W*W+W);
+double theta[MAX_DIM];
+//vector<double> theta(MAX_DIM);
 
 double lse(double a, double b){
   if(a < b) return b + log(1 + exp(a-b));
@@ -76,7 +91,7 @@ int sample_once(int xi, const Y &y){
   for(Y::iterator yj = y.begin(); yj != y.end(); yj = y.upper_bound(*yj)){
     logZ = lse(logZ, theta[to_int(T(xi, *yj))]);
   }
-  double u = rand() / (double) (RAND_MAX + 1);
+  double u = rand() / (double) RAND_MAX;
   double cur = -INFINITY;
   for(Y::iterator yj = y.begin(); yj != y.end(); yj = y.upper_bound(*yj)){
     cur = lse(cur, theta[to_int(T(xi, *yj))]);
@@ -164,12 +179,10 @@ int xtot[W];
 
 vector<example> examples;
 
-const int numThreads = 6;
-const int dim = W*W+W;
 double fObjParts[numThreads];
-double gObjParts[numThreads][dim];
+double gObjParts[numThreads][MAX_DIM];
 double fConParts[numThreads];
-double gConParts[numThreads][dim];
+double gConParts[numThreads][MAX_DIM];
 
 void process_part(int index, int start, int end, double w[]){
   // initialize other values
@@ -191,15 +204,17 @@ void process_part(int index, int start, int end, double w[]){
       gObj[p.first] -= p.second / N;
       logConstraint -= w[p.first] * p.second;
     }
-    for(int x : examples[n].x){
-      double logZ = -INFINITY;
-      for(int u : u_vec[n]){
-        logZ = lse(logZ, w[to_int(T(x,u))]);
+    if(algorithm == DEFAULT){ // only compute constraint for DEFAULT alg
+      for(int x : examples[n].x){
+        double logZ = -INFINITY;
+        for(int u : u_vec[n]){
+          logZ = lse(logZ, w[to_int(T(x,u))]);
+        }
+        logConstraint += logZ;
       }
-      logConstraint += logZ;
+      logC[n-start] = logConstraint;
+      Constraint += exp(logConstraint) / N;
     }
-    logC[n-start] = logConstraint;
-    Constraint += exp(logConstraint) / N;
   }
 
   //*fObj   =  Objective;
@@ -208,18 +223,20 @@ void process_part(int index, int start, int end, double w[]){
   fConParts[index] = Constraint;
 
   // compute gradient of constraint
-  for(int n = start; n < end; n++){
-    double wt = exp(logC[n-start]) / (N * Constraint);
-    for(auto p : A_vec[n]){
-      gCon[p.first] -= p.second * wt;
-    }
-    for(int x : examples[n].x){
-      double logZ = -INFINITY;
-      for(int u : u_vec[n]){
-        logZ = lse(logZ, w[to_int(T(x,u))]);
+  if(algorithm == DEFAULT){ // only compute constraint for DEFAULT alg
+    for(int n = start; n < end; n++){
+      double wt = exp(logC[n-start]) / (N * Constraint);
+      for(auto p : A_vec[n]){
+        gCon[p.first] -= p.second * wt;
       }
-      for(int u : u_vec[n]){
-        gCon[to_int(T(x,u))] += exp(w[to_int(T(x,u))]-logZ) * wt;
+      for(int x : examples[n].x){
+        double logZ = -INFINITY;
+        for(int u : u_vec[n]){
+          logZ = lse(logZ, w[to_int(T(x,u))]);
+        }
+        for(int u : u_vec[n]){
+          gCon[to_int(T(x,u))] += exp(w[to_int(T(x,u))]-logZ) * wt;
+        }
       }
     }
   }
@@ -283,7 +300,7 @@ void usrfun ( int *mode,  int *nnObj, int *nnCon,
     double ratio = fConParts[t] / Constraint;
     for(int i = 0; i < dim; i++){
       gObj[i] += gObjParts[t][i];
-      gCon[i] += ratio * gConParts[t][i];
+      if(algorithm == DEFAULT) gCon[i] += ratio * gConParts[t][i];
     }
   }
 
@@ -308,7 +325,11 @@ void usrfun ( int *mode,  int *nnObj, int *nnCon,
 
 
   *fObj = Objective;
-  fCon[0] = log(Constraint);
+  if(algorithm == DEFAULT){
+    fCon[0] = log(Constraint);
+  } else {
+    fCon[0] = 0.0;
+  }
 
 }
 
@@ -370,35 +391,67 @@ void process_examples(int start, int end){
 
 }
 
-int main(){
+int main(int argc, char *argv[]){
   static_assert(std::numeric_limits<float>::is_iec559, "IEEE 754 required");
+
+  int opt;
+  while((opt = getopt(argc, argv, "a:b:t")) != -1){
+    switch(opt){
+      case 'a':
+        sscanf(optarg, "%d", &algorithm);
+        cout << "Using algorithm " << algorithm << endl;
+        break;
+      case 'b':
+        sscanf(optarg, "%lf", &beta_val);
+        fixed_beta = true;
+        tied_beta = true;
+        cout << "Using fixed beta value " << beta_val << endl;
+        break;
+      case 't':
+        tied_beta = true;
+        cout << "Tying beta vales" << endl;
+        break;
+      default:
+        cout << "Exiting" << endl;
+        exit(0);
+    }
+  }
+  theta_dim = W*W;
+  if(fixed_beta){
+    beta_dim = 0;
+  } else if(tied_beta){
+    beta_dim = 1;
+  } else {
+    beta_dim = W;
+  }
+  dim = theta_dim + beta_dim;
 
   /* Begin SNOPT initialization */
   cout << "Initializing SNOPT structures..." << endl;
-  int n = W*W + W;
+  //int n = W*W + W; -- replace with dim
   int m = 1;
-  int ne = n;
+  int ne = dim;
   int nnCon = 1;
-  int nnObj = n;
-  int nnJac = n;
+  int nnObj = dim;
+  int nnJac = dim;
 
   int    *indJ = new int[ne];
-  int    *locJ = new int[n+1];
+  int    *locJ = new int[dim+1];
   double *valJ = new double[ne];
   
-  double *w  = new double[n+m];
-  double *bl = new double[n+m];
-  double *bu = new double[n+m];
+  double *w  = new double[dim+m];
+  double *bl = new double[dim+m];
+  double *bu = new double[dim+m];
   double *pi = new double[m];
-  double *rc = new double[n+m];
-  int    *hs = new    int[n+m];
+  double *rc = new double[dim+m];
+  int    *hs = new    int[dim+m];
   
   int    iObj    = -1;
   double ObjAdd  = 0;
 
-  for(int i = 0; i <= n; i++){
+  for(int i = 0; i <= dim; i++){
     locJ[i] = i;
-    if(i < n){
+    if(i < dim){
       indJ[i] = 0;
       valJ[i] = 0.0;
     }
@@ -406,16 +459,16 @@ int main(){
 
   int Cold = 0, Basis = 1, Warm = 2;
 
-  for(int i = 0; i < W*W; i++){
+  for(int i = 0; i < theta_dim; i++){
     bl[i] = -5; bu[i] = 5;
   }
-  for(int i = W*W; i < W*W + W; i++){
+  for(int i = theta_dim; i < dim; i++){
     bl[i] = 1.0/L; bu[i] = 5;
   }
-  bl[n] = -1.1e20; bu[n] = log(TAU);
-  cout << "bu[" << n << "] = " << bu[n] << endl;
+  bl[dim] = -1.1e20; bu[dim] = algorithm == DEFAULT ? log(TAU) : 1.1e20;
+  cout << "bu[" << dim << "] = " << bu[dim] << endl;
 
-  for ( int i = 0; i < n+m; i++ ) {
+  for ( int i = 0; i < dim+m; i++ ) {
     hs[i] = 0;
      w[i] = 0;
     rc[i] = 0;
@@ -435,8 +488,12 @@ int main(){
   cout << examples[0].y << endl;
 
   cout << "Initializing beta..." << endl;
-  for(int i = 0; i < W; i++){
-    theta[to_int(i)] = 1.0/L;
+  if(fixed_beta) theta[theta_dim] = beta_val;
+  else if(tied_beta) theta[theta_dim] = 1.0/L;
+  else {
+    for(int i = 0; i < W; i++){
+      theta[to_int(i)] = 1.0/L;
+    }
   }
 
   cout << "Populating xtot..." << endl;
@@ -464,9 +521,9 @@ int main(){
     cout << "Building SNOPT problem..." << endl;
     snoptProblemC prob("the_optimization");
 
-    for(int i=0;i<n;i++) w[i]=theta[i];
+    for(int i=0;i<dim;i++) w[i]=theta[i];
 
-    prob.setProblemSize ( m, n, nnCon, nnJac, nnObj );
+    prob.setProblemSize ( m, dim, nnCon, nnJac, nnObj );
     prob.setObjective   ( iObj, ObjAdd );
     prob.setJ           ( ne, valJ, indJ, locJ );
     prob.setX           ( bl, bu, w, pi, rc, hs );
@@ -480,7 +537,7 @@ int main(){
     if(t == 0) prob.solve( Cold );
     else       prob.solve( Warm );
 
-    for(int i = 0; i < n; i++) theta[i] = w[i];
+    for(int i = 0; i < dim; i++) theta[i] = w[i];
 
     cout << "Printing params..." << endl;
     cout << "THETA:" << endl;
