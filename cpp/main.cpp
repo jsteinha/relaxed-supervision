@@ -19,9 +19,13 @@
 
 using namespace std;
 
-const int W = 102; // vocabulary size
-const int L = 36; // sentence length
-const int N = 1200; // number of examples
+const int b = 5;
+const int W = 40; // vocabulary size
+const int L = 10; // sentence length
+const int N = 200; // number of examples
+//const int W = 102; // vocabulary size
+//const int L = 36; // sentence length
+//const int N = 1200; // number of examples
 const int TR = 50; // number of training iterations
 const int S = 20; // number of samples
 const double TAU = 200.0; // number of rejections per samples
@@ -204,7 +208,8 @@ int main(int argc, char *argv[]){
         exit(0);
     }
   }
-  task = new ByDerivation(theta, W, L);
+  //task = new ByDerivation(theta, W, L);
+  task = new ByDenotation(theta, b, W, L);
   double init_beta = task->init_beta();
 
   /* Begin SNOPT initialization */
