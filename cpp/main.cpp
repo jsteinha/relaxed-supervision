@@ -19,9 +19,9 @@
 
 using namespace std;
 
-const int W = 42; // vocabulary size
-const int L = 24; // sentence length
-const int N = 400; // number of examples
+const int W = 102; // vocabulary size
+const int L = 36; // sentence length
+const int N = 1200; // number of examples
 const int TR = 50; // number of training iterations
 const int S = 20; // number of samples
 const double TAU = 200.0; // number of rejections per samples
@@ -34,15 +34,13 @@ const int numThreads = 4;
 const int MAX_DIM = W*W+W+5;
 
 double theta[MAX_DIM];
-double w[MAX_DIM];
 
 // declare some structures that will be useful for the optimization
 double c_vec[N];
 LIN A_vec[N];
-vector<int> u_vec[N];
 
 vector<example> examples;
-Task* task = new ByDerivation(theta, w, W, L);
+Task* task;
 
 double fObjParts[numThreads];
 double gObjParts[numThreads][MAX_DIM];
@@ -69,7 +67,7 @@ void process_part(int index, int start, int end, double w[]){
       gObj[p.first] -= p.second / N;
       logConstraint -= w[p.first] * p.second;
     }
-    task->logZ(examples[n].x, Objective, gObj, 1.0/N);
+    task->logZ(examples[n].x, Objective, gObj, 1.0/N, w);
     if(algorithm == DEFAULT){ // only compute constraint for DEFAULT alg
       logConstraint += task->logZu(examples[n], w);
       logC[n-start] = logConstraint;
@@ -87,7 +85,7 @@ void process_part(int index, int start, int end, double w[]){
       for(auto p : A_vec[n]){
         gCon[p.first] -= p.second * wt;
       }
-      task->nablaLogZu(examples[n], gCon, wt);
+      task->nablaLogZu(examples[n], gCon, wt, w);
     }
   }
 }
@@ -130,7 +128,7 @@ void usrfun ( int *mode,  int *nnObj, int *nnCon,
   }
 
   // this can be single-threaded
-  task->logZbeta(Objective, gObj);
+  task->logZbeta(Objective, gObj, w);
 
   *fObj = Objective;
   if(algorithm == DEFAULT){
@@ -206,6 +204,7 @@ int main(int argc, char *argv[]){
         exit(0);
     }
   }
+  task = new ByDerivation(theta, W, L);
   double init_beta = task->init_beta();
 
   /* Begin SNOPT initialization */
@@ -225,6 +224,7 @@ int main(int argc, char *argv[]){
   double *bu = new double[dim+m];
   double *pi = new double[m];
   double *rc = new double[dim+m];
+  double *w  = new double[dim+m];
   int    *hs = new    int[dim+m];
   
   int    iObj    = -1;

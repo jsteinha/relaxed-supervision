@@ -23,10 +23,9 @@ using namespace std;
 class Task {
   protected:
     double* theta;
-    double* w;
   public:
     atomic<int> sample_num, sample_denom;
-    Task(double _theta[], double _w[]) : theta(_theta), w(_w), sample_num(0), sample_denom(0) {}
+    Task(double theta[]) : theta(theta), sample_num(0), sample_denom(0) {}
 
     virtual example make_example() = 0;
     virtual double init_beta() = 0;
@@ -34,10 +33,10 @@ class Task {
 
     virtual Z sample(const X &x, const Y &y, double &logZ) = 0;
     virtual vector<pair<int,double>> extract_features(const X &x, const Z &z, const Y &y) = 0;
-    virtual void logZ(const X &x, double& Objective, double gObj[], double wt) = 0;
+    virtual void logZ(const X &x, double& Objective, double gObj[], double wt, double w[]) = 0;
     virtual double logZu(example e, double params[]) = 0;
-    virtual void nablaLogZu(example e, double gCon[], double wt) = 0;
-    virtual void logZbeta(double &Objective, double gObj[]) = 0;
+    virtual void nablaLogZu(example e, double gCon[], double wt, double w[]) = 0;
+    virtual void logZbeta(double &Objective, double gObj[], double w[]) = 0;
 };
 
 class ByDerivation : public Task {
@@ -133,7 +132,7 @@ class ByDerivation : public Task {
       return cost;
     }
   public:
-    ByDerivation(double theta[], double w[], int W, int L) : Task(theta,w), W(W), L(L) {
+    ByDerivation(double theta[], int W, int L) : Task(theta), W(W), L(L) {
       theta_dim = W*W;
       if(fixed_beta){
         beta_dim = 0;
@@ -211,7 +210,7 @@ class ByDerivation : public Task {
       }
       return ret;
     }
-    virtual void logZ(const X &xs, double& Objective, double gObj[], double wt){
+    virtual void logZ(const X &xs, double& Objective, double gObj[], double wt, double w[]){
       for(int x : xs){
         double logZ = -INFINITY;
         for(int y = 0; y < W; y++){
@@ -235,7 +234,7 @@ class ByDerivation : public Task {
       }
       return ret;
     }
-    virtual void nablaLogZu(example e, double gCon[], double wt){
+    virtual void nablaLogZu(example e, double gCon[], double wt, double w[]){
       for(int x : e.x){
         double logZ = -INFINITY;
         for(int u : e.u){
@@ -246,7 +245,7 @@ class ByDerivation : public Task {
         }
       }
     }
-    virtual void logZbeta(double &Objective, double gObj[]){
+    virtual void logZbeta(double &Objective, double gObj[], double w[]){
       for(int i = 0; i < W; i++){
         double beta = w[to_int(i)];
         Objective += log(1 + (L-1) * exp(-beta));
