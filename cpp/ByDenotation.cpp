@@ -173,11 +173,11 @@ class ByDenotation : public Task {
     virtual void logZ(const X &xs, double &Objective, double gObj[], double wt, double w[]){
       for(int x : xs){
         double logZ = -INFINITY;
-        for(int z = 0; z < V; z++){
+        for(int z = 0; z <= P; z++){
           logZ = lse(logZ, w[to_int(T(x,z))]);
         }
         Objective += logZ * wt;
-        for(int z = 0; z < V; z++){
+        for(int z = 0; z <= P; z++){
           double th = w[to_int(T(x,z))];
           gObj[to_int(T(x,z))] += exp(th - logZ) * wt;
         }
@@ -187,7 +187,7 @@ class ByDenotation : public Task {
       double ret = 0.0;
       for(int x : e.x){
         double logZ = -INFINITY;
-        for(int z = 0; z < V; z++){
+        for(int z = 0; z <= P; z++){
           if(contains(predicates[z], e.y)){
             logZ = lse(logZ, params[to_int(T(x,z))]);
           }
@@ -199,12 +199,12 @@ class ByDenotation : public Task {
     virtual void nablaLogZu(example e, double gCon[], double wt, double w[]){
       for(int x : e.x){
         double logZ = -INFINITY;
-        for(int z = 0; z < V; z++){
+        for(int z = 0; z <= P; z++){
           if(contains(predicates[z], e.y)){
             logZ = lse(logZ, w[to_int(T(x,z))]);
           }
         }
-        for(int z = 0; z < V; z++){
+        for(int z = 0; z <= P; z++){
           if(contains(predicates[z], e.y)){
             gCon[to_int(T(x,z))] += exp(w[to_int(T(x,z))]-logZ) * wt;
           }
