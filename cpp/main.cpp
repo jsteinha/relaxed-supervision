@@ -15,7 +15,8 @@
 #include "global.h"
 #include "util.h"
 
-#include "Task.cpp"
+#include "Task.h"
+#include "ByDenotation.cpp"
 
 using namespace std;
 
@@ -209,7 +210,8 @@ int main(int argc, char *argv[]){
     }
   }
   //task = new ByDerivation(theta, W, L);
-  task = new ByDenotation(theta, b, W, L);
+  //task = new ByDenotationBinary(theta, b, W, L);
+  task = new ByDenotation(theta, 20, 10, 5, 0.85, 4);
   double init_beta = task->init_beta();
 
   /* Begin SNOPT initialization */
