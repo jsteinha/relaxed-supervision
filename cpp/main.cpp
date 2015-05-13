@@ -23,7 +23,7 @@ using namespace std;
 //const int b = 5;
 //const int W = 40; // vocabulary size
 //const int L = 10; // sentence length
-const int N = 200; // number of examples
+const int N = 300; // number of examples
 //const int W = 102; // vocabulary size
 //const int L = 36; // sentence length
 //const int N = 1200; // number of examples
@@ -158,13 +158,15 @@ void process_examples(int start, int end){
       double logZ = 0.0, logZcur;
       for(int s = 0; s < S; s++){
         zs.push_back(task->sample(ex, logZcur));
-        logZ += logZcur / S;
+        //logZ += logZcur / S;
       }
-      c_cur -= logZ;
+      //c_cur -= logZ;
       for(int s = 0; s < S; s++){
         for(auto &a : task->extract_features(ex.x, zs[s], ex.y)){
           A_cur.push_back(pair<int,double>(a.first, a.second/S));
-          c_cur += theta[a.first] * a.second/S;
+          if(a.first < theta_dim){
+            c_cur += theta[a.first] * a.second/S;
+          }
         }
       }
       c_cur -= task->logZu(ex, theta);
@@ -211,7 +213,8 @@ int main(int argc, char *argv[]){
   }
   //task = new ByDerivation(theta, W, L);
   //task = new ByDenotationBinary(theta, b, W, L);
-  task = new ByDenotation(theta, 100, 100, 70, 0.95, 20);
+  //task = new ByDenotation(theta, 100, 30, 20, 0.9, 10);
+  task = new ByDenotation(theta, 300, 100, 70, 0.95, 30);
   double init_beta = task->init_beta();
 
   /* Begin SNOPT initialization */
