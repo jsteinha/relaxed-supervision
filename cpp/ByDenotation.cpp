@@ -1,4 +1,5 @@
 #include "Task.h"
+#include <map>
 class ByDenotation : public Task {
   private:
     vector<vector<bool>> predicates;
@@ -25,24 +26,24 @@ class ByDenotation : public Task {
       }
       return true;
     }
-    int sample_once(int x, const Y &y){
+    int sample_once(int x, const vector<int> &u){ //const Y &y){
       double logZ = -INFINITY;
       for(int z = 0; z <= P; z++){
-        if(contains(predicates[z], y)){
+        if(u[z]/*contains(predicates[z], y)*/){
           logZ = lse(logZ, theta[to_int(T(x,z))]);
         }
       }
-      double u = rand() / (1.0 + RAND_MAX);
+      double v = rand() / (1.0 + RAND_MAX);
       double cur = -INFINITY;
       for(int z = 0; z <= P; z++){
-        if(contains(predicates[z], y)){
+        if(u[z]/*contains(predicates[z], y)*/){
           cur = lse(cur, theta[to_int(T(x,z))]);
-          if(u < exp(cur - logZ)){
+          if(v < exp(cur - logZ)){
             return z;
           }
         }
       }
-      cout << "UH OH " << u << " " << cur << " " << logZ << endl;
+      cout << "UH OH " << v << " " << cur << " " << logZ << endl;
       assert(false);
     }
     vector<int> diff(const Z &z, const Y &y){
@@ -111,6 +112,9 @@ class ByDenotation : public Task {
         }
         if(in) ex.y.insert(u);
       }
+      for(int p = 0; p <= P; p++){
+        ex.u.push_back(contains(predicates[p], ex.y));
+      }
       return ex;
     }
     virtual double init_beta(){
@@ -137,16 +141,16 @@ class ByDenotation : public Task {
     }
     
 
-    virtual Z sample(const X &x, const Y &y, double &logZ){
+    virtual Z sample(const example &e, double &logZ){
       int num_samples = 0;
       logZ = -INFINITY;
       while(true){
         ++num_samples;
         Z z;
         for(int i = 0; i < L; i++){
-          z.push_back(sample_once(x[i], y));
+          z.push_back(sample_once(e.x[i], e.u));
         }
-        double cost = compute_cost(z, y);
+        double cost = compute_cost(z, e.y);
         logZ = lse(logZ, -cost);
         if(rand() < exp(-cost) * RAND_MAX){
           logZ -= log(num_samples);
@@ -188,7 +192,7 @@ class ByDenotation : public Task {
       for(int x : e.x){
         double logZ = -INFINITY;
         for(int z = 0; z <= P; z++){
-          if(contains(predicates[z], e.y)){
+          if(e.u[z]/*contains(predicates[z], e.y)*/){
             logZ = lse(logZ, params[to_int(T(x,z))]);
           }
         }
@@ -200,12 +204,12 @@ class ByDenotation : public Task {
       for(int x : e.x){
         double logZ = -INFINITY;
         for(int z = 0; z <= P; z++){
-          if(contains(predicates[z], e.y)){
+          if(e.u[z]/*contains(predicates[z], e.y)*/){
             logZ = lse(logZ, w[to_int(T(x,z))]);
           }
         }
         for(int z = 0; z <= P; z++){
-          if(contains(predicates[z], e.y)){
+          if(e.u[z]/*contains(predicates[z], e.y)*/){
             gCon[to_int(T(x,z))] += exp(w[to_int(T(x,z))]-logZ) * wt;
           }
         }

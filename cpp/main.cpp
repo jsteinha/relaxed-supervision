@@ -28,7 +28,7 @@ const int N = 200; // number of examples
 //const int L = 36; // sentence length
 //const int N = 1200; // number of examples
 const int TR = 50; // number of training iterations
-const int S = 20; // number of samples
+const int S = 50; // number of samples
 const double TAU = 200.0; // number of rejections per samples
 
 const int DEFAULT = 0,
@@ -157,7 +157,7 @@ void process_examples(int start, int end){
       vector<Z> zs;
       double logZ = 0.0, logZcur;
       for(int s = 0; s < S; s++){
-        zs.push_back(task->sample(ex.x, ex.y, logZcur));
+        zs.push_back(task->sample(ex, logZcur));
         logZ += logZcur / S;
       }
       c_cur -= logZ;
