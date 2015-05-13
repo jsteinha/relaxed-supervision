@@ -23,7 +23,7 @@ using namespace std;
 //const int b = 5;
 //const int W = 40; // vocabulary size
 //const int L = 10; // sentence length
-const int N = 200; // number of examples
+const int N = 300; // number of examples
 //const int W = 102; // vocabulary size
 //const int L = 36; // sentence length
 //const int N = 1200; // number of examples
@@ -35,8 +35,8 @@ const int DEFAULT = 0,
           NO_CONSTRAINT = 1,
           IMPORTANCE = 2;
 
-const int numThreads = 4;
-const int MAX_DIM = 9999999; //W*W+W+5;
+const int numThreads = 24;
+const int MAX_DIM = 1999999; //W*W+W+5;
 
 double theta[MAX_DIM];
 
@@ -211,7 +211,7 @@ int main(int argc, char *argv[]){
   }
   //task = new ByDerivation(theta, W, L);
   //task = new ByDenotationBinary(theta, b, W, L);
-  task = new ByDenotation(theta, 100, 100, 70, 0.95, 20);
+  task = new ByDenotation(theta, 300, 100, 70, 0.95, 30);
   double init_beta = task->init_beta();
 
   /* Begin SNOPT initialization */
