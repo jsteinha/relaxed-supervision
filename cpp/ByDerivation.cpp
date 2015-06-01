@@ -140,16 +140,16 @@ class ByDerivation : public Task {
     }
 
 
-    virtual Z sample(const X &x, const Y &y, double &logZ){
+    virtual Z sample(const example &e, double &logZ){
       int num_samples = 0;
       logZ = -INFINITY;
       while(true){
         ++num_samples;
         Z z;
-        for(int i = 0; i < x.size(); i++){
-          z.push_back(sample_once(x[i], y));
+        for(int i = 0; i < e.x.size(); i++){
+          z.push_back(sample_once(e.x[i], e.y));
         }
-        double cost = compute_cost(z, y);
+        double cost = compute_cost(z, e.y);
         logZ = lse(logZ, -cost);
         if(rand() < exp(-cost) * RAND_MAX){
           logZ -= log(num_samples);
