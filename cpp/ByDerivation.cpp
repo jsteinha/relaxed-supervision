@@ -142,6 +142,7 @@ class ByDerivation : public Task {
       cout << "Printing params..." << endl;
       cout << "THETA:" << endl;
       double trace = 0.0, trace2 = 0.0;
+      vector<double> diag;
       for(int x = 0; x < W; x++){
         double logZ = -INFINITY;
         for(int y = 0; y < W; y++) logZ = lse(logZ, theta[to_int(T(x,y))]);
@@ -151,12 +152,13 @@ class ByDerivation : public Task {
           if(x == y){
             trace += prob;
             if(prob > 0.75) trace2 += 1.0;
+            diag.push_back(prob);
           }
         }
         printf("\n");
       }
       cout << "THETA_diag:" << endl;
-      for(int x = 0; x < W; x++) printf("%.2f ", theta[to_int(T(x,x))]);
+      for(int x = 0; x < W; x++) printf("%.2f ", diag[x]);
       printf("\n");
       cout << "BETA:" << endl;
       for(int y = 0; y < W; y++) printf("%.2f ", theta[to_int(y)]);

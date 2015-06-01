@@ -90,13 +90,13 @@ void process_part(int index, int start, int end, double w[]){
   if(algorithm == DEFAULT){ // only compute constraint for DEFAULT alg
     for(int n = start; n < end; n++){
       double wt = exp(logC[n-start]) / (N * Constraint);
-      for(auto p : A_vec[n]){
-        gCon[p.first] -= p.second * wt;
-      }
       assert(stage == 1 || stage == 2);
       if(stage == 1){
         task->nablaSumBeta(examples[n], gCon, wt, w);
       } else {
+        for(auto p : A_vec[n]){
+          gCon[p.first] -= p.second * wt;
+        }
         task->nablaLogZu(examples[n], gCon, wt, w);
       }
     }
