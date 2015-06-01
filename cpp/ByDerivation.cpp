@@ -225,7 +225,7 @@ class ByDerivation : public Task {
     virtual double sumBeta(example e, double w[]){
       double sum = 0.0;
       for(int u : e.u){
-        sum += theta[to_int(u)];
+        sum += w[to_int(u)];
       }
       return sum;
     }
