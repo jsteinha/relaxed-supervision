@@ -3,6 +3,7 @@
 class ByDerivation : public Task {
   private:
     int W, L;
+    double delta, delta2;
     typedef pair<int,int> T;
     typedef int B;
     int to_int(T t){
@@ -15,10 +16,18 @@ class ByDerivation : public Task {
 
     example make_example_iid(){
       example e;
+      bool prev_bad = false;
       for(int i = 0; i < L; i++){
         int c = rand() % W;
         e.x.push_back(c);
-        e.y.insert(c);
+        bool bad = (prev_bad && flip(delta2)) || flip(delta);
+        if(!bad){
+          e.y.insert(c);
+        } else {
+          int c2 = rand() % W;
+          e.y.insert(c2);
+        }
+        prev_bad = bad;
       }
       return e;
     }
@@ -27,12 +36,20 @@ class ByDerivation : public Task {
       assert(W%3==0);
       assert(L%2==0);
       example e;
+      bool prev_bad = false;
       for(int i = 0; i < L; i++){
         int c;
         if(i%2==0){ c = 3 * (rand() % (W/3)); }
         else { c = e.x[i-1] + 1 + rand() % 2; }
         e.x.push_back(c);
-        e.y.insert(c);
+        bool bad = (prev_bad && flip(delta2)) || flip(delta);
+        if(!bad){
+          e.y.insert(c);
+        } else {
+          int c2 = rand() % W;
+          e.y.insert(c2);
+        }
+        prev_bad = bad;
       }
       return e;
     }
@@ -93,7 +110,8 @@ class ByDerivation : public Task {
       return cost;
     }
   public:
-    ByDerivation(double theta[], int W, int L) : Task(theta), W(W), L(L) {
+    ByDerivation(double theta[], int W, int L, double delta=0.0, double delta2=0.0)
+        : Task(theta), W(W), L(L), delta(delta), delta2(delta2) {
       theta_dim = W*W;
       if(fixed_beta){
         beta_dim = 0;

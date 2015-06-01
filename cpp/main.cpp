@@ -188,7 +188,8 @@ int main(int argc, char *argv[]){
   // see if defaults are overridden by args
   int opt;
   int seed = 0;
-  while((opt = getopt(argc, argv, "a:b:s:N:S:T:L:t")) != -1){
+  double delta = 0.0, delta2 = 0.0;
+  while((opt = getopt(argc, argv, "a:b:d:e:s:N:S:T:L:t")) != -1){
     switch(opt){
       case 'a':
         sscanf(optarg, "%d", &algorithm);
@@ -222,6 +223,12 @@ int main(int argc, char *argv[]){
       case 'W':
         sscanf(optarg, "%d", &W);
         break;
+      case 'd':
+        sscanf(optarg, "%lf", &delta);
+        break;
+      case 'e':
+        sscanf(optarg, "%lf", &delta2);
+        break;
       default:
         cout << "Exiting" << endl;
         exit(0);
@@ -238,13 +245,15 @@ int main(int argc, char *argv[]){
   printf("OPTION TAU %lf\n", TAU);
   printf("OPTION L %d\n", L);
   printf("OPTION W %d\n", W);
+  printf("OPTION delta %lf\n", delta);
+  printf("OPTION delta2 %d\n", delta2);
 
   //task = new ByDerivation(theta, W, L);
   //task = new ByDenotationBinary(theta, b, W, L);
   //task = new ByDenotation(theta, 100, 30, 20, 0.9, 10);
   //task = new ByDenotation(theta, 300, 100, 70, 0.95, 30);
-  task = new ByDerivation(theta, W, L);
-  printf("OPTION task ByDerivation(%d, %d)\n", W, L);
+  task = new ByDerivation(theta, W, L, delta, delta2);
+  printf("OPTION task ByDerivation(%d, %d, %lf, %lf)\n", W, L, delta, delta2);
   double init_beta = task->init_beta();
 
   /* Begin SNOPT initialization */

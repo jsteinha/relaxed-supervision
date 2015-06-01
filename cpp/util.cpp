@@ -1,4 +1,5 @@
 #include <cmath>
+#include <cstdlib>
 #include "util.h"
 
 double lse(double a, double b){
@@ -6,3 +7,6 @@ double lse(double a, double b){
   else return a + log(1 + exp(b-a));
 }
 
+bool flip(double p){
+  return rand() < p * (RAND_MAX + 1.0);
+}
