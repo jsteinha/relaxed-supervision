@@ -39,6 +39,8 @@ class Task {
     virtual void logZ(const X &x, double& Objective, double gObj[], double wt, double w[]) = 0;
     virtual double logZu(example e, double params[]) = 0;
     virtual void nablaLogZu(example e, double gCon[], double wt, double w[]) = 0;
+    virtual double sumBeta(example e, double w[]) = 0;
+    virtual void nablaSumBeta(example e, double gCon[], double wt, double w[]) = 0;
     virtual void logZbeta(double &Objective, double gObj[], double w[]) = 0;
 };
 

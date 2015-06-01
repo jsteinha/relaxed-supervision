@@ -213,6 +213,13 @@ class ByDerivation : public Task {
       }
       return ret;
     }
+    virtual double sumBeta(example e, double w[]){
+      double sum = 0.0;
+      for(int u : e.u){
+        sum += theta[to_int(u)];
+      }
+      return sum;
+    }
     virtual void nablaLogZu(example e, double gCon[], double wt, double w[]){
       for(int x : e.x){
         double logZ = -INFINITY;
@@ -222,6 +229,11 @@ class ByDerivation : public Task {
         for(int u : e.u){
           gCon[to_int(T(x,u))] += exp(w[to_int(T(x,u))]-logZ) * wt;
         }
+      }
+    }
+    virtual void nablaSumBeta(example e, double gCon[], double wt, double w[]){
+      for(int u : e.u){
+        gCon[to_int(u)] += wt;
       }
     }
     virtual void logZbeta(double &Objective, double gObj[], double w[]){

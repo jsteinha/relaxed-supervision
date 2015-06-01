@@ -31,6 +31,7 @@ double TAU = 200.0; // number of rejections per samples
 const int DEFAULT = 0,
           NO_CONSTRAINT = 1,
           IMPORTANCE = 2;
+int stage = 1;
 
 const int numThreads = 4;
 const int MAX_DIM = 9999999; //W*W+W+5;
@@ -71,7 +72,12 @@ void process_part(int index, int start, int end, double w[]){
     }
     task->logZ(examples[n].x, Objective, gObj, 1.0/N, w);
     if(algorithm == DEFAULT){ // only compute constraint for DEFAULT alg
-      logConstraint += task->logZu(examples[n], w);
+      assert(stage == 1 || stage == 2);
+      if(stage == 1){
+        logConstraint = task->sumBeta(examples[n], w);
+      } else {
+        logConstraint += task->logZu(examples[n], w);
+      }
       logC[n-start] = logConstraint;
       Constraint += exp(logConstraint) / N;
     }
@@ -87,7 +93,12 @@ void process_part(int index, int start, int end, double w[]){
       for(auto p : A_vec[n]){
         gCon[p.first] -= p.second * wt;
       }
-      task->nablaLogZu(examples[n], gCon, wt, w);
+      assert(stage == 1 || stage == 2);
+      if(stage == 1){
+        task->nablaSumBeta(examples[n], gCon, wt, w);
+      } else {
+        task->nablaLogZu(examples[n], gCon, wt, w);
+      }
     }
   }
 }
@@ -325,8 +336,9 @@ int main(int argc, char *argv[]){
   }
 
   for(int t = 0; t < TR; t++){
+    if(t >= TR/2) stage = 2;
     task->sample_num = task->sample_denom = 0;
-    cout << "Beginning iteration " << (t+1) << endl;
+    cout << "Beginning iteration " << (t+1) << " (stage=" << stage << ")" << endl;
     // initialize optimization structures
 
     // launch threads for each segment of examples
