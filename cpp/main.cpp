@@ -16,20 +16,17 @@
 #include "util.h"
 
 #include "Task.h"
-#include "ByDenotation.cpp"
+//#include "ByDenotation.cpp"
+#include "ByDerivation.cpp"
 
 using namespace std;
 
-//const int b = 5;
-//const int W = 40; // vocabulary size
-//const int L = 10; // sentence length
-const int N = 300; // number of examples
-//const int W = 102; // vocabulary size
-//const int L = 36; // sentence length
-//const int N = 1200; // number of examples
+int N = 300; // number of examples
+int W = 102; // vocabulary size
+int L = 36; // sentence length
 const int TR = 50; // number of training iterations
-const int S = 50; // number of samples
-const double TAU = 200.0; // number of rejections per samples
+int S = 50; // number of samples
+double TAU = 200.0; // number of rejections per samples
 
 const int DEFAULT = 0,
           NO_CONSTRAINT = 1,
@@ -190,7 +187,7 @@ int main(int argc, char *argv[]){
 
   // see if defaults are overridden by args
   int opt;
-  while((opt = getopt(argc, argv, "a:b:t")) != -1){
+  while((opt = getopt(argc, argv, "a:b:N:S:T:L:t")) != -1){
     switch(opt){
       case 'a':
         sscanf(optarg, "%d", &algorithm);
@@ -206,6 +203,21 @@ int main(int argc, char *argv[]){
         tied_beta = true;
         cout << "Tying beta vales" << endl;
         break;
+      case 'N':
+        sscanf(optarg, "%d", &N);
+        break;
+      case 'S':
+        sscanf(optarg, "%d", &S);
+        break;
+      case 'T':
+        sscanf(optarg, "%lf", &TAU);
+        break;
+      case 'L':
+        sscanf(optarg, "%d", &L);
+        break;
+      case 'W':
+        sscanf(optarg, "%d", &W);
+        break;
       default:
         cout << "Exiting" << endl;
         exit(0);
@@ -214,7 +226,8 @@ int main(int argc, char *argv[]){
   //task = new ByDerivation(theta, W, L);
   //task = new ByDenotationBinary(theta, b, W, L);
   //task = new ByDenotation(theta, 100, 30, 20, 0.9, 10);
-  task = new ByDenotation(theta, 300, 100, 70, 0.95, 30);
+  //task = new ByDenotation(theta, 300, 100, 70, 0.95, 30);
+  task = new ByDerivation(theta, W, L);
   double init_beta = task->init_beta();
 
   /* Begin SNOPT initialization */
