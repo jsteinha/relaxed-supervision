@@ -141,8 +141,8 @@ class ByDenotation : public Task {
     }
     
 
-    virtual Z sample(const example &e, double &logZ){
-      int num_samples = 0;
+    virtual Z sample(const example &e, double &logZ, int &num_samples){
+      num_samples = 0;
       logZ = -INFINITY;
       while(true){
         ++num_samples;

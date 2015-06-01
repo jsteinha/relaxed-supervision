@@ -2,6 +2,7 @@
 
 class ByDerivation : public Task {
   private:
+    vector<int> freqs;
     int W, L;
     double delta, delta2;
     double r;
@@ -112,7 +113,7 @@ class ByDerivation : public Task {
     }
   public:
     ByDerivation(double theta[], int W, int L, double delta=0.0, double delta2=0.0, double r=0.0)
-        : Task(theta), W(W), L(L), delta(delta), delta2(delta2), r(r) {
+        : Task(theta), W(W), L(L), delta(delta), delta2(delta2), r(r), freqs(W) {
       theta_dim = W*W;
       if(fixed_beta){
         beta_dim = 0;
@@ -133,6 +134,7 @@ class ByDerivation : public Task {
         u_cur.insert(*yj);
       }
       ex.u = vector<int>(u_cur.begin(), u_cur.end());
+      for(int x : ex.x) freqs[x]++;
       return ex;
     }
     virtual double init_beta(){
@@ -163,14 +165,17 @@ class ByDerivation : public Task {
       cout << "BETA:" << endl;
       for(int y = 0; y < W; y++) printf("%.2f ", theta[to_int(y)]);
       printf("\n");
+      cout << "FREQS:" << endl;
+      for(int x = 0; x < W; x++) printf("%d ", freqs[x]);
+      printf("\n");
       printf("Trace: %.2f\n", trace);
       printf("Trace2: %.2f\n", trace2);
       printf("\n");
     }
 
 
-    virtual Z sample(const example &e, double &logZ){
-      int num_samples = 0;
+    virtual Z sample(const example &e, double &logZ, int &num_samples){
+      num_samples = 0;
       logZ = -INFINITY;
       while(true){
         ++num_samples;

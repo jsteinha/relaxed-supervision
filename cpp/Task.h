@@ -34,7 +34,7 @@ class Task {
     virtual double init_beta() = 0;
     virtual void print() = 0;
 
-    virtual Z sample(const example &e, double &logZ) = 0;
+    virtual Z sample(const example &e, double &logZ, int &num_samples) = 0;
     virtual vector<pair<int,double>> extract_features(const X &x, const Z &z, const Y &y) = 0;
     virtual void logZ(const X &x, double& Objective, double gObj[], double wt, double w[]) = 0;
     virtual double logZu(example e, double params[]) = 0;

@@ -164,10 +164,14 @@ void process_examples(int start, int end){
       // generate S samples
       vector<Z> zs;
       double logZ = 0.0, logZcur;
+      int num_samples = 0;
       for(int s = 0; s < S; s++){
-        zs.push_back(task->sample(ex, logZcur));
+        int num_samples_cur = 0;
+        zs.push_back(task->sample(ex, logZcur, num_samples_cur));
+        num_samples += num_samples_cur;
         //logZ += logZcur / S;
       }
+      printf("SAMPLES %d %.2f\n", ex_num, num_samples / (double) S);
       //c_cur -= logZ;
       for(int s = 0; s < S; s++){
         for(auto &a : task->extract_features(ex.x, zs[s], ex.y)){
