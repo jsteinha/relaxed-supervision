@@ -38,8 +38,8 @@ const int MAX_DIM = 9999999; //W*W+W+5;
 double theta[MAX_DIM];
 
 // declare some structures that will be useful for the optimization
-double c_vec[N];
-LIN A_vec[N];
+double c_vec[MAX_DIM];
+LIN A_vec[MAX_DIM];
 
 vector<example> examples;
 Task* task;
@@ -187,7 +187,8 @@ int main(int argc, char *argv[]){
 
   // see if defaults are overridden by args
   int opt;
-  while((opt = getopt(argc, argv, "a:b:N:S:T:L:t")) != -1){
+  int seed = 0;
+  while((opt = getopt(argc, argv, "a:b:s:N:S:T:L:t")) != -1){
     switch(opt){
       case 'a':
         sscanf(optarg, "%d", &algorithm);
@@ -202,6 +203,9 @@ int main(int argc, char *argv[]){
       case 't':
         tied_beta = true;
         cout << "Tying beta vales" << endl;
+        break;
+      case 's':
+        sscanf(optarg, "%d", &seed);
         break;
       case 'N':
         sscanf(optarg, "%d", &N);
@@ -223,11 +227,24 @@ int main(int argc, char *argv[]){
         exit(0);
     }
   }
+  srand(seed);
+  printf("OPTION algorithm %d\n", algorithm);
+  printf("OPTION fixed_beta %d\n", fixed_beta);
+  printf("OPTION tied_beta %d\n", tied_beta);
+  printf("OPTION beta_val %lf\n", beta_val);
+  printf("OPTION seed %d\n", seed);
+  printf("OPTION N %d\n", N);
+  printf("OPTION S %d\n", S);
+  printf("OPTION TAU %lf\n", TAU);
+  printf("OPTION L %d\n", L);
+  printf("OPTION W %d\n", W);
+
   //task = new ByDerivation(theta, W, L);
   //task = new ByDenotationBinary(theta, b, W, L);
   //task = new ByDenotation(theta, 100, 30, 20, 0.9, 10);
   //task = new ByDenotation(theta, 300, 100, 70, 0.95, 30);
   task = new ByDerivation(theta, W, L);
+  printf("OPTION task ByDerivation(%d, %d)\n", W, L);
   double init_beta = task->init_beta();
 
   /* Begin SNOPT initialization */
