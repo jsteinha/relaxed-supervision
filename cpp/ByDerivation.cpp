@@ -4,6 +4,7 @@ class ByDerivation : public Task {
   private:
     int W, L;
     double delta, delta2;
+    double r;
     typedef pair<int,int> T;
     typedef int B;
     int to_int(T t){
@@ -18,7 +19,7 @@ class ByDerivation : public Task {
       example e;
       bool prev_bad = false;
       for(int i = 0; i < L; i++){
-        int c = rand() % W;
+        int c = power_law(W/3, r);
         e.x.push_back(c);
         bool bad = (prev_bad && flip(delta2)) || flip(delta);
         if(!bad){
@@ -39,7 +40,7 @@ class ByDerivation : public Task {
       bool prev_bad = false;
       for(int i = 0; i < L; i++){
         int c;
-        if(i%2==0){ c = 3 * (rand() % (W/3)); }
+        if(i%2==0){ c = 3 * power_law(W/3, r); }
         else { c = e.x[i-1] + 1 + rand() % 2; }
         e.x.push_back(c);
         bool bad = (prev_bad && flip(delta2)) || flip(delta);
@@ -110,8 +111,8 @@ class ByDerivation : public Task {
       return cost;
     }
   public:
-    ByDerivation(double theta[], int W, int L, double delta=0.0, double delta2=0.0)
-        : Task(theta), W(W), L(L), delta(delta), delta2(delta2) {
+    ByDerivation(double theta[], int W, int L, double delta=0.0, double delta2=0.0, double r=0.0)
+        : Task(theta), W(W), L(L), delta(delta), delta2(delta2), r(r) {
       theta_dim = W*W;
       if(fixed_beta){
         beta_dim = 0;
