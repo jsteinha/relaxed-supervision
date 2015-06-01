@@ -141,21 +141,29 @@ class ByDerivation : public Task {
     virtual void print(){
       cout << "Printing params..." << endl;
       cout << "THETA:" << endl;
-      double trace = 0.0;
+      double trace = 0.0, trace2 = 0.0;
       for(int x = 0; x < W; x++){
         double logZ = -INFINITY;
         for(int y = 0; y < W; y++) logZ = lse(logZ, theta[to_int(T(x,y))]);
         for(int y = 0; y < W; y++){
           double prob = exp(theta[to_int(T(x,y))]-logZ);
           printf("%.2f ", prob);
-          if(x == y) trace += prob;
+          if(x == y){
+            trace += prob;
+            if(prob > 0.75) trace2 += 1.0;
+          }
         }
         printf("\n");
       }
+      cout << "THETA_diag:" << endl;
+      for(int x = 0; x < W; x++) printf("%.2f ", theta[to_int(T(x,x))]);
+      printf("\n");
       cout << "BETA:" << endl;
       for(int y = 0; y < W; y++) printf("%.2f ", theta[to_int(y)]);
       printf("\n");
-      printf("Trace: %.2f\n\n", trace);
+      printf("Trace: %.2f\n", trace);
+      printf("Trace2: %.2f\n", trace2);
+      printf("\n");
     }
 
 
