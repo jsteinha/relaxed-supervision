@@ -163,7 +163,7 @@ void process_examples(int start, int end){
 
       // generate S samples
       vector<Z> zs;
-      double logZ = 0.0, logZcur;
+      double logZcur; //logZ = 0.0, logZcur;
       int num_samples = 0;
       for(int s = 0; s < S; s++){
         int num_samples_cur = 0;
@@ -203,8 +203,8 @@ int main(int argc, char *argv[]){
   // see if defaults are overridden by args
   int opt;
   int seed = 0;
-  double delta = 0.0, delta2 = 0.0;
-  while((opt = getopt(argc, argv, "a:b:d:e:s:N:S:T:L:t")) != -1){
+  double delta = 0.0, delta2 = 0.0, r = 0.0;
+  while((opt = getopt(argc, argv, "a:b:d:e:r:s:N:S:T:L:t")) != -1){
     switch(opt){
       case 'a':
         sscanf(optarg, "%d", &algorithm);
@@ -244,6 +244,9 @@ int main(int argc, char *argv[]){
       case 'e':
         sscanf(optarg, "%lf", &delta2);
         break;
+      case 'r':
+        sscanf(optarg, "%lf", &r);
+        break;
       default:
         cout << "Exiting" << endl;
         exit(0);
@@ -261,13 +264,14 @@ int main(int argc, char *argv[]){
   printf("OPTION L %d\n", L);
   printf("OPTION W %d\n", W);
   printf("OPTION delta %lf\n", delta);
-  printf("OPTION delta2 %d\n", delta2);
+  printf("OPTION delta2 %lf\n", delta2);
+  printf("OPTION r %lf\n", r);
 
   //task = new ByDerivation(theta, W, L);
   //task = new ByDenotationBinary(theta, b, W, L);
   //task = new ByDenotation(theta, 100, 30, 20, 0.9, 10);
   //task = new ByDenotation(theta, 300, 100, 70, 0.95, 30);
-  task = new ByDerivation(theta, W, L, delta, delta2);
+  task = new ByDerivation(theta, W, L, delta, delta2, r);
   printf("OPTION task ByDerivation(%d, %d, %lf, %lf)\n", W, L, delta, delta2);
   double init_beta = task->init_beta();
 

@@ -2,10 +2,10 @@
 
 class ByDerivation : public Task {
   private:
-    vector<int> freqs;
     int W, L;
     double delta, delta2;
     double r;
+    vector<int> freqs;
     typedef pair<int,int> T;
     typedef int B;
     int to_int(T t){
