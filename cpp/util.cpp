@@ -1,6 +1,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cassert>
+#include <stdio.h>
 #include "util.h"
 
 double lse(double a, double b){
@@ -16,7 +17,7 @@ bool flip(double p){
 // p(k) is proportional to (k+1)^(-r)
 int power_law(int max_val, double r){
   assert(r >= 0.0); // if r < 0, results are undefined
-  assert(abs(r-1) >= .05); // avoid numerical instabilities near r = 1
+  assert(fabs(r-1) >= .05); // avoid numerical instabilities near r = 1
   double s = r - 1;
   double u = rand() / (RAND_MAX + 1.0);
   double v = -1 + pow(u + (1-u) * pow(max_val+1, -s), -1.0/s);
