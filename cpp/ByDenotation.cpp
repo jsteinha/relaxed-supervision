@@ -8,6 +8,7 @@ class ByDenotation : public Task {
     int P; // number of predicates (P <= V)
     double alpha; // fraction of universe for each predicate
     int L; // length of sentence
+    double delta, r;
     typedef pair<int,int> T; // pair (x,z) where x in [0,V) and y in [0,P]
     typedef int B; // in [0,U)
     int to_int(T t){
@@ -18,7 +19,9 @@ class ByDenotation : public Task {
       else return theta_dim + b;
     }
     inline int f(int x){
-      return min(x, P);
+      if(x < V-P) return P;
+      else return x-(V-P);
+      //return min(x, P);
     }
     bool contains(const vector<bool> &pred, const Y &y){
       for(auto &u : y){
@@ -29,14 +32,14 @@ class ByDenotation : public Task {
     int sample_once(int x, const vector<int> &u){ //const Y &y){
       double logZ = -INFINITY;
       for(int z = 0; z <= P; z++){
-        if(u[z]/*contains(predicates[z], y)*/){
+        if(u[z]){
           logZ = lse(logZ, theta[to_int(T(x,z))]);
         }
       }
       double v = rand() / (1.0 + RAND_MAX);
       double cur = -INFINITY;
       for(int z = 0; z <= P; z++){
-        if(u[z]/*contains(predicates[z], y)*/){
+        if(u[z]){
           cur = lse(cur, theta[to_int(T(x,z))]);
           if(v < exp(cur - logZ)){
             return z;
@@ -46,32 +49,41 @@ class ByDenotation : public Task {
       cout << "UH OH " << v << " " << cur << " " << logZ << endl;
       assert(false);
     }
-    vector<int> diff(const Z &z, const Y &y){
-      vector<int> ret;
+    vector<int> diff(const Z &z, const Y &y, const vector<int> &contains_y){
+      // z is already constructed so that denote(z) \supset y
+      // now, for each predicate p such that y \subset p, 
+      //   we also need denote(z) \subset p
+      // so, first compute denote(z)
+      // then loop through predicates and check containment
+      Y denotation;
       for(int u = 0; u < U; u++){
-        if(y.count(u)) continue;
-        bool ok = false;
-        // make sure everything not in y is ruled out
+        bool in = true;
         for(int p : z){
-          if(predicates[p][u] == false){
-            ok = true;
+          if(!predicates[p][u]){
+            in = false;
             break;
           }
         }
-        if(!ok) ret.push_back(u);
+        if(in) denotation.insert(u);
+      }
+      vector<int> ret;
+      for(int p = 0; p <= P; p++){
+        if(contains_y[p] && !contains(predicates[p], denotation)){
+          ret.push_back(p);
+        }
       }
       return ret;
     }
-    double compute_cost(const Z &z, const Y &y){
+    double compute_cost(const Z &z, const example &e){
       double cost = 0.0;
-      for(int u : diff(z, y)){
-        cost += theta[to_int(u)];
+      for(int p : diff(z, e.y, e.u)){
+        cost += theta[to_int(p)];
       }
       return cost;
     }
   public:
-    ByDenotation(double theta[], int U, int V, int P, double alpha, int L) :
-                 Task(theta), U(U), V(V), P(P), alpha(alpha), L(L) {
+    ByDenotation(double theta[], int U, int V, int P, double alpha, int L, double delta, double r) :
+                 Task(theta), U(U), V(V), P(P), alpha(alpha), L(L), delta(delta), r(r) {
       for(int p = 0; p < P; p++){
         vector<bool> pred;
         for(int u = 0; u < U; u++){
@@ -91,20 +103,24 @@ class ByDenotation : public Task {
       } else if(tied_beta){
         beta_dim = 1;
       } else {
-        beta_dim = U;
+        beta_dim = P+1;
       }
       dim = theta_dim + beta_dim;
     }
     virtual example make_example(){
       example ex;
+      vector<int> zs;
       for(int j = 0; j < L; j++){
-        int x = rand() % V;
+        int x = power_law(V, r);
         ex.x.push_back(x);
+        int z = f(ex.x[j]);
+        if(flip(delta)) z = rand() % (P+1);
+        zs.push_back(z);
       }
       for(int u = 0; u < U; u++){
         bool in = true;
         for(int j = 0; j < L; j++){
-          int p = f(ex.x[j]);
+          int p = zs[j];
           if(!predicates[p][u]){
             in = false;
             break;
@@ -118,7 +134,7 @@ class ByDenotation : public Task {
       return ex;
     }
     virtual double init_beta(){
-      return 1.0/U;
+      return 1.0/L;
     }
     virtual void print(){
       cout << "Printing params..." << endl;
@@ -150,7 +166,7 @@ class ByDenotation : public Task {
         for(int i = 0; i < L; i++){
           z.push_back(sample_once(e.x[i], e.u));
         }
-        double cost = compute_cost(z, e.y);
+        double cost = compute_cost(z, e);
         logZ = lse(logZ, -cost);
         if(rand() < exp(-cost) * RAND_MAX){
           logZ -= log(num_samples);
@@ -160,15 +176,15 @@ class ByDenotation : public Task {
         }
       }
     }
-    virtual vector<pair<int,double>> extract_features(const X &x, const Z &z, const Y &y){
+    virtual vector<pair<int,double>> extract_features(const example &e, const Z &z){
       vector<pair<int,double>> ret;
       // x to z
       for(int j = 0; j < L; j++){
-        int index = to_int(T(x[j],z[j]));
+        int index = to_int(T(e.x[j],z[j]));
         ret.push_back(pair<int,double>(index, 1.0));
       }
       // z to y
-      for(int u : diff(z,y)){
+      for(int u : diff(z,e.y,e.u)){
         int index = to_int(u);
         ret.push_back(pair<int,double>(index, -1.0));
       }
@@ -200,6 +216,15 @@ class ByDenotation : public Task {
       }
       return ret;
     }
+    virtual double sumBeta(example e, double w[]){
+      double sum = 0.0;
+      for(int p = 0; p <= P; p++){
+        if(e.u[p]){
+          sum += w[to_int(p)];
+        }
+      }
+      return sum;
+    }
     virtual void nablaLogZu(example e, double gCon[], double wt, double w[]){
       for(int x : e.x){
         double logZ = -INFINITY;
@@ -212,6 +237,13 @@ class ByDenotation : public Task {
           if(e.u[z]/*contains(predicates[z], e.y)*/){
             gCon[to_int(T(x,z))] += exp(w[to_int(T(x,z))]-logZ) * wt;
           }
+        }
+      }
+    }
+    virtual void nablaSumBeta(example e, double gCon[], double wt, double w[]){
+      for(int p = 0; p <= P; p++){
+        if(e.u[p]){
+          gCon[to_int(p)] += wt;
         }
       }
     }

@@ -180,7 +180,7 @@ class ByDerivation : public Task {
       while(true){
         ++num_samples;
         Z z;
-        for(int i = 0; i < e.x.size(); i++){
+        for(unsigned int i = 0; i < e.x.size(); i++){
           z.push_back(sample_once(e.x[i], e.y));
         }
         double cost = compute_cost(z, e.y);
@@ -193,13 +193,13 @@ class ByDerivation : public Task {
         }
       }
     }
-    virtual vector<pair<int,double>> extract_features(const X &x, const Z &z, const Y &y){
+    virtual vector<pair<int,double>> extract_features(const example &e, const Z &z){
       vector<pair<int,double>> ret;
       for(int j = 0; j < L; j++){
-        int index = to_int(T(x[j],z[j]));
+        int index = to_int(T(e.x[j],z[j]));
         ret.push_back(pair<int,double>(index, 1.0));
       }
-      for(int yj : diff(y, z2y(z))){
+      for(int yj : diff(e.y, z2y(z))){
         int index = to_int(yj);
         ret.push_back(pair<int,double>(index, -1.0));
       }

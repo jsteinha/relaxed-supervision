@@ -8,6 +8,8 @@ import fileinput
 args = []
 #opts = ['trace', 'trace2', 'beta']
 opts = ['trace2']
+agg_opts = [('beta_val', 'tied_beta', 'N')]
+agg = [defaultdict(list) for _ in agg_opts]
 descs = defaultdict(dict)
 for line in fileinput.input():
   toks = line.rstrip("\n").split()
@@ -27,7 +29,7 @@ print 'args', args
 matches = [[] for _ in args]
 
 #outputdir = "/afs/cs.stanford.edu/u/jsteinhardt/NLP-HOME/scr/relaxed-supervision/output"
-outputdir = "output4"
+outputdir = "output5"
 from os import listdir
 from os.path import isfile, join
 from itertools import islice
@@ -54,19 +56,22 @@ for f in files:
         if not ok:
           break
     if ok:
-      matches[ii].append(f)
+      matches[ii].append((f, arg))
 
 #markers = ['.', 'x', '^', 's', '+', 'o', '*', 'v']
 colors = ['r', 'g', 'b', 'k', 'c', 'm', 'y']
 for arg, match in zip(args, matches):
   desc = '_'.join(['%s-%s' % (k,v) for k, v in arg.items() if float(v) != 0.0])
+  if desc == '':
+    desc = 'all'
   plt.figure(1)
   plt.clf()
   plt.hold(True)
   #if len(match) != 1:
   #  raise Exception('non-unique match for %s: %s' % (arg, match))
   handles_dict = dict()
-  for ii, ma in enumerate(match):
+  for ii, tup in enumerate(match):
+    ma, full_arg = tup
     if id(arg) in descs and ma in descs[id(arg)]:
       name = descs[id(arg)][ma][1]
       order= descs[id(arg)][ma][0]
@@ -131,6 +136,12 @@ for arg, match in zip(args, matches):
       axarr[1].bar(range(len(freqs)), freqs)
       plt.savefig('beta_%s.pdf' % name)
       plt.figure(1)
+    for ii, opt in enumerate(agg_opts):
+      accs = [it['trace2']/102.0 for it in iterations if 'trace2' in it]
+      if len(accs) > 0:
+        key = '-'.join([full_arg[o] for o in opt[:-1]])
+        val = full_arg[opt[-1]]
+        agg[ii][key].append((float(val), accs[-1]))
   handles_list = [h[1][0] for h in sorted(handles_dict.items())]
   labels_list = [h[1][1] for h in sorted(handles_dict.items())]
   print handles_list
@@ -139,3 +150,15 @@ for arg, match in zip(args, matches):
   plt.xlabel('iterations')
   plt.ylabel('accuracy')
   plt.savefig('%s.pdf' % desc)
+
+  # handle agg_opts
+  for ii, aa in enumerate(agg):
+    plt.clf()
+    plt.hold(True)
+    for k, v in aa.items():
+      xys = sorted(v)
+      xs = [xy[0] for xy in xys]
+      ys = [xy[1] for xy in xys]
+      plt.plot(xs, ys, label=k)
+    plt.legend(loc=4,prop={'size':10})
+    plt.savefig('%s_%s_%s.pdf' % (desc, '-'.join(agg_opts[ii][:-1]), agg_opts[ii][-1]))

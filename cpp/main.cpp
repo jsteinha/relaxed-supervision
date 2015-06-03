@@ -16,7 +16,7 @@
 #include "util.h"
 
 #include "Task.h"
-//#include "ByDenotation.cpp"
+#include "ByDenotation.cpp"
 #include "ByDerivation.cpp"
 
 using namespace std;
@@ -31,6 +31,7 @@ double TAU = 200.0; // number of rejections per samples
 const int DEFAULT = 0,
           NO_CONSTRAINT = 1,
           IMPORTANCE = 2;
+const int DECIPHERMENT = 0, PREDICATE = 1;
 int stage = 1;
 
 const int numThreads = 4;
@@ -174,7 +175,7 @@ void process_examples(int start, int end){
       printf("SAMPLES %d %.2f\n", ex_num, num_samples / (double) S);
       //c_cur -= logZ;
       for(int s = 0; s < S; s++){
-        for(auto &a : task->extract_features(ex.x, zs[s], ex.y)){
+        for(auto &a : task->extract_features(ex, zs[s])){
           A_cur.push_back(pair<int,double>(a.first, a.second/S));
           if(a.first < theta_dim){
             c_cur += theta[a.first] * a.second/S;
@@ -203,8 +204,11 @@ int main(int argc, char *argv[]){
   // see if defaults are overridden by args
   int opt;
   int seed = 0;
+  int model = 0;
+  int U = 300, P = 90;
   double delta = 0.0, delta2 = 0.0, r = 0.0;
-  while((opt = getopt(argc, argv, "a:b:d:e:r:s:N:S:T:L:t")) != -1){
+  double alpha = 0.95;
+  while((opt = getopt(argc, argv, "a:b:d:e:f:r:s:m:U:P:N:S:T:L:t")) != -1){
     switch(opt){
       case 'a':
         sscanf(optarg, "%d", &algorithm);
@@ -222,6 +226,12 @@ int main(int argc, char *argv[]){
         break;
       case 's':
         sscanf(optarg, "%d", &seed);
+        break;
+      case 'U':
+        sscanf(optarg, "%d", &U);
+        break;
+      case 'P':
+        sscanf(optarg, "%d", &P);
         break;
       case 'N':
         sscanf(optarg, "%d", &N);
@@ -244,9 +254,14 @@ int main(int argc, char *argv[]){
       case 'e':
         sscanf(optarg, "%lf", &delta2);
         break;
+      case 'f':
+        sscanf(optarg, "%lf", &alpha);
+        break;
       case 'r':
         sscanf(optarg, "%lf", &r);
         break;
+      case 'm':
+        sscanf(optarg, "%d", &model);
       default:
         cout << "Exiting" << endl;
         exit(0);
@@ -263,16 +278,28 @@ int main(int argc, char *argv[]){
   printf("OPTION TAU %lf\n", TAU);
   printf("OPTION L %d\n", L);
   printf("OPTION W %d\n", W);
+  printf("OPTION U %d\n", U);
+  printf("OPTION P %d\n", P);
   printf("OPTION delta %lf\n", delta);
   printf("OPTION delta2 %lf\n", delta2);
+  printf("OPTION alpha %lf\n", alpha);
   printf("OPTION r %lf\n", r);
+  printf("OPTION model %d\n", model);
 
   //task = new ByDerivation(theta, W, L);
   //task = new ByDenotationBinary(theta, b, W, L);
   //task = new ByDenotation(theta, 100, 30, 20, 0.9, 10);
-  //task = new ByDenotation(theta, 300, 100, 70, 0.95, 30);
-  task = new ByDerivation(theta, W, L, delta, delta2, r);
-  printf("OPTION task ByDerivation(%d, %d, %lf, %lf)\n", W, L, delta, delta2);
+  if(model == DECIPHERMENT){
+    task = new ByDerivation(theta, W, L, delta, delta2, r);
+    printf("OPTION task ByDerivation(%d, %d, %lf, %lf)\n", W, L, delta, delta2);
+  } else if(model == PREDICATE){
+    task = new ByDenotation(theta, U, W, P, alpha, L, delta, r);
+    printf("OPTION task ByDenotation(%d, %d, %lf, %lf)\n", W, L, delta, delta2);
+  } else {
+    cout << "Invalid model: " << model << endl;
+    cout << "Exiting" << endl;
+    exit(0);
+  }
   double init_beta = task->init_beta();
 
   /* Begin SNOPT initialization */
@@ -306,7 +333,7 @@ int main(int argc, char *argv[]){
     }
   }
 
-  int Cold = 0, Basis = 1, Warm = 2;
+  int Cold = 0, /*Basis = 1, */Warm = 2;
 
   for(int i = 0; i < theta_dim; i++){
     bl[i] = -5; bu[i] = 5;
