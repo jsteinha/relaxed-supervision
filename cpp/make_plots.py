@@ -2,20 +2,32 @@ import sys
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from collections import defaultdict
 
 import fileinput
 args = []
+#opts = ['trace', 'trace2', 'beta']
+opts = ['trace2']
+descs = defaultdict(dict)
 for line in fileinput.input():
   toks = line.rstrip("\n").split()
+  if toks[0] == 'desc':
+    order = int(toks[1])
+    name = toks[2]
+    name2 = ' '.join(toks[3:])
+    descs[id(cur_arg)][name] = (order, name2)
+    continue
   arg = dict()
   for tok in toks:
     kv = tok.split(":")
     arg[kv[0]] = kv[1]
   args.append(arg)
+  cur_arg = arg
 print 'args', args
 matches = [[] for _ in args]
 
-outputdir = "/afs/cs.stanford.edu/u/jsteinhardt/NLP-HOME/scr/relaxed-supervision/output"
+#outputdir = "/afs/cs.stanford.edu/u/jsteinhardt/NLP-HOME/scr/relaxed-supervision/output"
+outputdir = "output4"
 from os import listdir
 from os.path import isfile, join
 from itertools import islice
@@ -44,49 +56,86 @@ for f in files:
     if ok:
       matches[ii].append(f)
 
+#markers = ['.', 'x', '^', 's', '+', 'o', '*', 'v']
+colors = ['r', 'g', 'b', 'k', 'c', 'm', 'y']
 for arg, match in zip(args, matches):
-  if len(match) != 1:
-    raise Exception('non-unique match for %s: %s' % (arg, match))
-  name = match[0]
-  f = open(join(outputdir, match[0]))
-  iterations = []
-  prev_beta = False
-  prev_theta_diag = False
-  prev_freqs = False
-  iteration = []
-  for line in f:
-    toks = line.rstrip("\n").split()
-    if len(toks) == 0:
-      continue
-    if "iteration" in toks:
-      if iteration:
-        iterations.append(iteration)
-      iteration = dict()
-      if "(stage=1)" in toks:
-        iteration['stage'] = 1
-      elif "(stage=2)" in toks:
-        iteration['stage'] = 2
-      else:
-        iteration['stage'] = 0
-      iteration['samples'] = dict()
-    if toks[0] == "SAMPLES":
-      iteration['samples'][int(toks[1])] = float(toks[2])
-    if "Average" in toks and "samples:" in toks:
-      iteration['avg_samples'] = float(toks[-1])
-    if toks[0] == "Trace:":
-      iteration['trace'] = float(toks[-1])
-    if toks[0] == "Trace2:":
-      iteration['trace2'] = float(toks[-1])
-    if prev_beta:
-      iteration['beta'] = map(float, toks)
-    if prev_theta_diag:
-      iteration['theta'] = map(float, toks)
-    prev_beta = "BETA:" in toks
-    prev_theta_diag = "THETA_diag:" in toks
-    prev_freqs = "FREQS:" in toks
-  print iterations
+  desc = '_'.join(['%s-%s' % (k,v) for k, v in arg.items() if float(v) != 0.0])
+  plt.figure(1)
   plt.clf()
   plt.hold(True)
-  plt.plot([it['trace'] for it in iterations if 'trace' in it], 'b', label='trace')
-  plt.plot([it['avg_samples'] for it in iterations if 'avg_samples' in it], 'k', label='samples')
-  plt.savefig('%s.pdf' % name)
+  #if len(match) != 1:
+  #  raise Exception('non-unique match for %s: %s' % (arg, match))
+  handles_dict = dict()
+  for ii, ma in enumerate(match):
+    if id(arg) in descs and ma in descs[id(arg)]:
+      name = descs[id(arg)][ma][1]
+      order= descs[id(arg)][ma][0]
+    else:
+      name = ma
+      order = ii
+    if order == -1:
+      continue
+    f = open(join(outputdir, ma))
+    iterations = []
+    prev_beta = False
+    prev_theta_diag = False
+    prev_freqs = False
+    iteration = []
+    for line in f:
+      toks = line.rstrip("\n").split()
+      if len(toks) == 0:
+        continue
+      if "iteration" in toks:
+        if iteration:
+          iterations.append(iteration)
+        iteration = dict()
+        if "(stage=1)" in toks:
+          iteration['stage'] = 1
+        elif "(stage=2)" in toks:
+          iteration['stage'] = 2
+        else:
+          iteration['stage'] = 0
+        iteration['samples'] = dict()
+      if toks[0] == "SAMPLES":
+        iteration['samples'][int(toks[1])] = float(toks[2])
+      if "Average" in toks and "samples:" in toks:
+        iteration['avg_samples'] = float(toks[-1])
+      if toks[0] == "Trace:":
+        iteration['trace'] = float(toks[-1])
+      if toks[0] == "Trace2:":
+        iteration['trace2'] = float(toks[-1])
+      if prev_beta:
+        iteration['beta'] = map(float, toks)
+      if prev_theta_diag:
+        iteration['theta'] = map(float, toks)
+      if prev_freqs:
+        iteration['freqs'] = map(int, toks)
+      prev_beta = "BETA:" in toks
+      prev_theta_diag = "THETA_diag:" in toks
+      prev_freqs = "FREQS:" in toks
+    print iterations
+    if 'trace' in opts:
+      plt.plot([it['trace']/102.0 for it in iterations if 'trace' in it], '%s-o' % colors[ii % len(colors)]) #, label='trace (%s)' % name)
+    if 'trace2' in opts:
+      line, = plt.plot([it['trace2']/102.0 for it in iterations if 'trace2' in it], '.-', color=colors[order % len(colors)]) #, label='%s' % name)
+      handles_dict[order] = (line, name)
+    if 'avg_samples' in opts:
+      plt.plot([it['avg_samples']/100.0 for it in iterations if 'avg_samples' in it], '%s-s' % colors[order % len(colors)], label='samples/100 (%s)' % name)
+    if 'beta' in opts and 'a0' in name and 't0' in name:
+      plt.figure(2)
+      f, axarr = plt.subplots(2)
+      axarr[0].matshow([it['beta'] for it in iterations if 'beta' in it])
+      #plt.colorbar()
+      plt.title(name)
+      freqs = iterations[0]['freqs']
+      axarr[1].bar(range(len(freqs)), freqs)
+      plt.savefig('beta_%s.pdf' % name)
+      plt.figure(1)
+  handles_list = [h[1][0] for h in sorted(handles_dict.items())]
+  labels_list = [h[1][1] for h in sorted(handles_dict.items())]
+  print handles_list
+  plt.legend(handles_list, labels_list, loc=4,prop={'size':10})
+  #plt.title(desc)
+  plt.xlabel('iterations')
+  plt.ylabel('accuracy')
+  plt.savefig('%s.pdf' % desc)
