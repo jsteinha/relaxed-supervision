@@ -9,6 +9,7 @@ class ByDenotation : public Task {
     double alpha; // fraction of universe for each predicate
     int L; // length of sentence
     double delta, r;
+    vector<int> freqs;
     typedef pair<int,int> T; // pair (x,z) where x in [0,V) and y in [0,P]
     typedef int B; // in [0,U)
     int to_int(T t){
@@ -83,7 +84,7 @@ class ByDenotation : public Task {
     }
   public:
     ByDenotation(double theta[], int U, int V, int P, double alpha, int L, double delta, double r) :
-                 Task(theta), U(U), V(V), P(P), alpha(alpha), L(L), delta(delta), r(r) {
+                 Task(theta), U(U), V(V), P(P), alpha(alpha), L(L), delta(delta), r(r), freqs(V) {
       for(int p = 0; p < P; p++){
         vector<bool> pred;
         for(int u = 0; u < U; u++){
@@ -113,6 +114,7 @@ class ByDenotation : public Task {
       for(int j = 0; j < L; j++){
         int x = power_law(V, r);
         ex.x.push_back(x);
+        freqs[x]++;
         int z = f(ex.x[j]);
         if(flip(delta)) z = rand() % (P+1);
         zs.push_back(z);
@@ -139,21 +141,34 @@ class ByDenotation : public Task {
     virtual void print(){
       cout << "Printing params..." << endl;
       cout << "THETA:" << endl;
-      double trace = 0.0;
+      double trace = 0.0, trace2 = 0.0;
+      vector<double> diag;
       for(int x = 0; x < V; x++){
         double logZ = -INFINITY;
         for(int z = 0; z <= P; z++) logZ = lse(logZ, theta[to_int(T(x,z))]);
         for(int z = 0; z <= P; z++){
           double prob = exp(theta[to_int(T(x,z))]-logZ);
           printf("%.2f ", prob);
-          if(f(x) == z) trace += prob;
+          if(f(x) == z){
+            trace += prob;
+            if(prob > 0.50) trace2 += 1.0;
+            diag.push_back(prob);
+          }
         }
         printf("\n");
       }
-      cout << "BETA:" << endl;
-      for(int j = 0; j < U; j++) printf("%.2f ", theta[to_int(j)]);
+      cout << "THETA_diag:" << endl;
+      for(double diag_x : diag) printf("%.2f ", diag_x);
       printf("\n");
-      printf("Trace: %.2f\n\n", trace);
+      cout << "BETA:" << endl;
+      for(int j = 0; j < beta_dim; j++) printf("%.2f ", theta[to_int(j)]);
+      printf("\n");
+      cout << "FREQS:" << endl;
+      for(int x = 0; x < V; x++) printf("%d ", freqs[x]);
+      printf("\n");
+      printf("Trace: %.2f\n", trace);
+      printf("Trace2: %.2f\n", trace2);
+      printf("\n");
     }
     
 

@@ -208,7 +208,7 @@ int main(int argc, char *argv[]){
   int U = 300, P = 90;
   double delta = 0.0, delta2 = 0.0, r = 0.0;
   double alpha = 0.95;
-  while((opt = getopt(argc, argv, "a:b:d:e:f:r:s:m:U:P:N:S:T:L:t")) != -1){
+  while((opt = getopt(argc, argv, "a:b:d:e:f:r:s:m:W:U:P:N:S:T:L:t")) != -1){
     switch(opt){
       case 'a':
         sscanf(optarg, "%d", &algorithm);
@@ -262,6 +262,7 @@ int main(int argc, char *argv[]){
         break;
       case 'm':
         sscanf(optarg, "%d", &model);
+        break;
       default:
         cout << "Exiting" << endl;
         exit(0);
