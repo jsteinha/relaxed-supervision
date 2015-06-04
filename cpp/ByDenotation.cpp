@@ -114,11 +114,11 @@ class ByDenotation : public Task {
       for(int j = 0; j < L; j++){
         int x = power_law(V, r);
         ex.x.push_back(x);
-        freqs[x]++;
         int z = f(ex.x[j]);
         if(flip(delta)) z = rand() % (P+1);
         zs.push_back(z);
       }
+      bool any = false;
       for(int u = 0; u < U; u++){
         bool in = true;
         for(int j = 0; j < L; j++){
@@ -128,11 +128,19 @@ class ByDenotation : public Task {
             break;
           }
         }
-        if(in) ex.y.insert(u);
+        if(in){
+          ex.y.insert(u);
+          any = true;
+        }
+      }
+      if(!any){
+        cout << "re-generating... (y = [])" << endl;
+        return make_example(); // then try again
       }
       for(int p = 0; p <= P; p++){
         ex.u.push_back(contains(predicates[p], ex.y));
       }
+      for(int x : ex.x) freqs[x]++;
       return ex;
     }
     virtual double init_beta(){
