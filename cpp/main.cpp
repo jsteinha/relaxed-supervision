@@ -104,6 +104,7 @@ void process_part(int index, int start, int end, double w[]){
   }
 }
 
+double rho = 0.001;
 void usrfun ( int *mode,  int *nnObj, int *nnCon,
      int *nnJac, int *nnL,   int *negCon, double w[],
      double *fObj,  double gObj[],
@@ -143,6 +144,12 @@ void usrfun ( int *mode,  int *nnObj, int *nnCon,
 
   // this can be single-threaded
   task->logZbeta(Objective, gObj, w);
+
+  // L2 reg
+  for(int i = 0; i < theta_dim; i++){
+    Objective += 0.5 * rho * w[i] * w[i];
+    gObj[i] += rho * w[i];
+  }
 
   *fObj = Objective;
   if(algorithm == DEFAULT){
@@ -286,6 +293,7 @@ int main(int argc, char *argv[]){
   printf("OPTION alpha %lf\n", alpha);
   printf("OPTION r %lf\n", r);
   printf("OPTION model %d\n", model);
+  printf("OPTION rho %lf\n", rho);
 
   //task = new ByDerivation(theta, W, L);
   //task = new ByDenotationBinary(theta, b, W, L);
