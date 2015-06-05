@@ -17,23 +17,22 @@
 
 #include "Task.h"
 #include "ByDenotation.cpp"
+#include "ByDerivation.cpp"
 
 using namespace std;
 
-//const int b = 5;
-//const int W = 40; // vocabulary size
-//const int L = 10; // sentence length
-const int N = 300; // number of examples
-//const int W = 102; // vocabulary size
-//const int L = 36; // sentence length
-//const int N = 1200; // number of examples
+int N = 300; // number of examples
+int W = 102; // vocabulary size
+int L = 36; // sentence length
 const int TR = 50; // number of training iterations
-const int S = 50; // number of samples
-const double TAU = 200.0; // number of rejections per samples
+int S = 50; // number of samples
+double TAU = 200.0; // number of rejections per samples
 
 const int DEFAULT = 0,
           NO_CONSTRAINT = 1,
           IMPORTANCE = 2;
+const int DECIPHERMENT = 0, PREDICATE = 1;
+int stage = 1;
 
 const int numThreads = 24;
 const int MAX_DIM = 1999999; //W*W+W+5;
@@ -41,8 +40,8 @@ const int MAX_DIM = 1999999; //W*W+W+5;
 double theta[MAX_DIM];
 
 // declare some structures that will be useful for the optimization
-double c_vec[N];
-LIN A_vec[N];
+double c_vec[MAX_DIM];
+LIN A_vec[MAX_DIM];
 
 vector<example> examples;
 Task* task;
@@ -74,7 +73,12 @@ void process_part(int index, int start, int end, double w[]){
     }
     task->logZ(examples[n].x, Objective, gObj, 1.0/N, w);
     if(algorithm == DEFAULT){ // only compute constraint for DEFAULT alg
-      logConstraint += task->logZu(examples[n], w);
+      assert(stage == 1 || stage == 2);
+      if(stage == 1){
+        logConstraint = task->sumBeta(examples[n], w);
+      } else {
+        logConstraint += task->logZu(examples[n], w);
+      }
       logC[n-start] = logConstraint;
       Constraint += exp(logConstraint) / N;
     }
@@ -87,14 +91,20 @@ void process_part(int index, int start, int end, double w[]){
   if(algorithm == DEFAULT){ // only compute constraint for DEFAULT alg
     for(int n = start; n < end; n++){
       double wt = exp(logC[n-start]) / (N * Constraint);
-      for(auto p : A_vec[n]){
-        gCon[p.first] -= p.second * wt;
+      assert(stage == 1 || stage == 2);
+      if(stage == 1){
+        task->nablaSumBeta(examples[n], gCon, wt, w);
+      } else {
+        for(auto p : A_vec[n]){
+          gCon[p.first] -= p.second * wt;
+        }
+        task->nablaLogZu(examples[n], gCon, wt, w);
       }
-      task->nablaLogZu(examples[n], gCon, wt, w);
     }
   }
 }
 
+double rho = 0.001;
 void usrfun ( int *mode,  int *nnObj, int *nnCon,
      int *nnJac, int *nnL,   int *negCon, double w[],
      double *fObj,  double gObj[],
@@ -135,6 +145,12 @@ void usrfun ( int *mode,  int *nnObj, int *nnCon,
   // this can be single-threaded
   task->logZbeta(Objective, gObj, w);
 
+  // L2 reg
+  for(int i = 0; i < theta_dim; i++){
+    Objective += 0.5 * rho * w[i] * w[i];
+    gObj[i] += rho * w[i];
+  }
+
   *fObj = Objective;
   if(algorithm == DEFAULT){
     fCon[0] = log(Constraint);
@@ -155,14 +171,18 @@ void process_examples(int start, int end){
 
       // generate S samples
       vector<Z> zs;
-      double logZ = 0.0, logZcur;
+      double logZcur; //logZ = 0.0, logZcur;
+      int num_samples = 0;
       for(int s = 0; s < S; s++){
-        zs.push_back(task->sample(ex, logZcur));
+        int num_samples_cur = 0;
+        zs.push_back(task->sample(ex, logZcur, num_samples_cur));
+        num_samples += num_samples_cur;
         //logZ += logZcur / S;
       }
+      printf("SAMPLES %d %.2f\n", ex_num, num_samples / (double) S);
       //c_cur -= logZ;
       for(int s = 0; s < S; s++){
-        for(auto &a : task->extract_features(ex.x, zs[s], ex.y)){
+        for(auto &a : task->extract_features(ex, zs[s])){
           A_cur.push_back(pair<int,double>(a.first, a.second/S));
           if(a.first < theta_dim){
             c_cur += theta[a.first] * a.second/S;
@@ -190,7 +210,12 @@ int main(int argc, char *argv[]){
 
   // see if defaults are overridden by args
   int opt;
-  while((opt = getopt(argc, argv, "a:b:t")) != -1){
+  int seed = 0;
+  int model = 0;
+  int U = 300, P = 90;
+  double delta = 0.0, delta2 = 0.0, r = 0.0;
+  double alpha = 0.95;
+  while((opt = getopt(argc, argv, "a:b:d:e:f:r:s:m:W:U:P:N:S:T:L:t")) != -1){
     switch(opt){
       case 'a':
         sscanf(optarg, "%d", &algorithm);
@@ -206,15 +231,84 @@ int main(int argc, char *argv[]){
         tied_beta = true;
         cout << "Tying beta vales" << endl;
         break;
+      case 's':
+        sscanf(optarg, "%d", &seed);
+        break;
+      case 'U':
+        sscanf(optarg, "%d", &U);
+        break;
+      case 'P':
+        sscanf(optarg, "%d", &P);
+        break;
+      case 'N':
+        sscanf(optarg, "%d", &N);
+        break;
+      case 'S':
+        sscanf(optarg, "%d", &S);
+        break;
+      case 'T':
+        sscanf(optarg, "%lf", &TAU);
+        break;
+      case 'L':
+        sscanf(optarg, "%d", &L);
+        break;
+      case 'W':
+        sscanf(optarg, "%d", &W);
+        break;
+      case 'd':
+        sscanf(optarg, "%lf", &delta);
+        break;
+      case 'e':
+        sscanf(optarg, "%lf", &delta2);
+        break;
+      case 'f':
+        sscanf(optarg, "%lf", &alpha);
+        break;
+      case 'r':
+        sscanf(optarg, "%lf", &r);
+        break;
+      case 'm':
+        sscanf(optarg, "%d", &model);
+        break;
       default:
         cout << "Exiting" << endl;
         exit(0);
     }
   }
+  srand(seed);
+  printf("OPTION algorithm %d\n", algorithm);
+  printf("OPTION fixed_beta %d\n", fixed_beta);
+  printf("OPTION tied_beta %d\n", tied_beta);
+  printf("OPTION beta_val %lf\n", beta_val);
+  printf("OPTION seed %d\n", seed);
+  printf("OPTION N %d\n", N);
+  printf("OPTION S %d\n", S);
+  printf("OPTION TAU %lf\n", TAU);
+  printf("OPTION L %d\n", L);
+  printf("OPTION W %d\n", W);
+  printf("OPTION U %d\n", U);
+  printf("OPTION P %d\n", P);
+  printf("OPTION delta %lf\n", delta);
+  printf("OPTION delta2 %lf\n", delta2);
+  printf("OPTION alpha %lf\n", alpha);
+  printf("OPTION r %lf\n", r);
+  printf("OPTION model %d\n", model);
+  printf("OPTION rho %lf\n", rho);
+
   //task = new ByDerivation(theta, W, L);
   //task = new ByDenotationBinary(theta, b, W, L);
   //task = new ByDenotation(theta, 100, 30, 20, 0.9, 10);
-  task = new ByDenotation(theta, 300, 100, 70, 0.95, 30);
+  if(model == DECIPHERMENT){
+    task = new ByDerivation(theta, W, L, delta, delta2, r);
+    printf("OPTION task ByDerivation(%d, %d, %lf, %lf)\n", W, L, delta, delta2);
+  } else if(model == PREDICATE){
+    task = new ByDenotation(theta, U, W, P, alpha, L, delta, r);
+    printf("OPTION task ByDenotation(%d, %d, %lf, %lf)\n", W, L, delta, delta2);
+  } else {
+    cout << "Invalid model: " << model << endl;
+    cout << "Exiting" << endl;
+    exit(0);
+  }
   double init_beta = task->init_beta();
 
   /* Begin SNOPT initialization */
@@ -248,7 +342,7 @@ int main(int argc, char *argv[]){
     }
   }
 
-  int Cold = 0, Basis = 1, Warm = 2;
+  int Cold = 0, /*Basis = 1, */Warm = 2;
 
   for(int i = 0; i < theta_dim; i++){
     bl[i] = -5; bu[i] = 5;
@@ -286,8 +380,9 @@ int main(int argc, char *argv[]){
   }
 
   for(int t = 0; t < TR; t++){
+    if(t >= TR/2) stage = 2;
     task->sample_num = task->sample_denom = 0;
-    cout << "Beginning iteration " << (t+1) << endl;
+    cout << "Beginning iteration " << (t+1) << " (stage=" << stage << ")" << endl;
     // initialize optimization structures
 
     // launch threads for each segment of examples

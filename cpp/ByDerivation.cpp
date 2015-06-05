@@ -3,6 +3,9 @@
 class ByDerivation : public Task {
   private:
     int W, L;
+    double delta, delta2;
+    double r;
+    vector<int> freqs;
     typedef pair<int,int> T;
     typedef int B;
     int to_int(T t){
@@ -15,10 +18,18 @@ class ByDerivation : public Task {
 
     example make_example_iid(){
       example e;
+      bool prev_bad = false;
       for(int i = 0; i < L; i++){
-        int c = rand() % W;
+        int c = power_law(W/3, r);
         e.x.push_back(c);
-        e.y.insert(c);
+        bool bad = (prev_bad && flip(delta2)) || flip(delta);
+        if(!bad){
+          e.y.insert(c);
+        } else {
+          int c2 = rand() % W;
+          e.y.insert(c2);
+        }
+        prev_bad = bad;
       }
       return e;
     }
@@ -27,12 +38,20 @@ class ByDerivation : public Task {
       assert(W%3==0);
       assert(L%2==0);
       example e;
+      bool prev_bad = false;
       for(int i = 0; i < L; i++){
         int c;
-        if(i%2==0){ c = 3 * (rand() % (W/3)); }
+        if(i%2==0){ c = 3 * power_law(W/3, r); }
         else { c = e.x[i-1] + 1 + rand() % 2; }
         e.x.push_back(c);
-        e.y.insert(c);
+        bool bad = (prev_bad && flip(delta2)) || flip(delta);
+        if(!bad){
+          e.y.insert(c);
+        } else {
+          int c2 = rand() % W;
+          e.y.insert(c2);
+        }
+        prev_bad = bad;
       }
       return e;
     }
@@ -93,7 +112,8 @@ class ByDerivation : public Task {
       return cost;
     }
   public:
-    ByDerivation(double theta[], int W, int L) : Task(theta), W(W), L(L) {
+    ByDerivation(double theta[], int W, int L, double delta=0.0, double delta2=0.0, double r=0.0)
+        : Task(theta), W(W), L(L), delta(delta), delta2(delta2), r(r), freqs(W) {
       theta_dim = W*W;
       if(fixed_beta){
         beta_dim = 0;
@@ -114,6 +134,7 @@ class ByDerivation : public Task {
         u_cur.insert(*yj);
       }
       ex.u = vector<int>(u_cur.begin(), u_cur.end());
+      for(int x : ex.x) freqs[x]++;
       return ex;
     }
     virtual double init_beta(){
@@ -122,34 +143,47 @@ class ByDerivation : public Task {
     virtual void print(){
       cout << "Printing params..." << endl;
       cout << "THETA:" << endl;
-      double trace = 0.0;
+      double trace = 0.0, trace2 = 0.0;
+      vector<double> diag;
       for(int x = 0; x < W; x++){
         double logZ = -INFINITY;
         for(int y = 0; y < W; y++) logZ = lse(logZ, theta[to_int(T(x,y))]);
         for(int y = 0; y < W; y++){
           double prob = exp(theta[to_int(T(x,y))]-logZ);
           printf("%.2f ", prob);
-          if(x == y) trace += prob;
+          if(x == y){
+            trace += prob;
+            if(prob > 0.75) trace2 += 1.0;
+            diag.push_back(prob);
+          }
         }
         printf("\n");
       }
+      cout << "THETA_diag:" << endl;
+      for(int x = 0; x < W; x++) printf("%.2f ", diag[x]);
+      printf("\n");
       cout << "BETA:" << endl;
       for(int y = 0; y < W; y++) printf("%.2f ", theta[to_int(y)]);
       printf("\n");
-      printf("Trace: %.2f\n\n", trace);
+      cout << "FREQS:" << endl;
+      for(int x = 0; x < W; x++) printf("%d ", freqs[x]);
+      printf("\n");
+      printf("Trace: %.2f\n", trace);
+      printf("Trace2: %.2f\n", trace2);
+      printf("\n");
     }
 
 
-    virtual Z sample(const X &x, const Y &y, double &logZ){
-      int num_samples = 0;
+    virtual Z sample(const example &e, double &logZ, int &num_samples){
+      num_samples = 0;
       logZ = -INFINITY;
       while(true){
         ++num_samples;
         Z z;
-        for(int i = 0; i < x.size(); i++){
-          z.push_back(sample_once(x[i], y));
+        for(unsigned int i = 0; i < e.x.size(); i++){
+          z.push_back(sample_once(e.x[i], e.y));
         }
-        double cost = compute_cost(z, y);
+        double cost = compute_cost(z, e.y);
         logZ = lse(logZ, -cost);
         if(rand() < exp(-cost) * RAND_MAX){
           logZ -= log(num_samples);
@@ -159,13 +193,13 @@ class ByDerivation : public Task {
         }
       }
     }
-    virtual vector<pair<int,double>> extract_features(const X &x, const Z &z, const Y &y){
+    virtual vector<pair<int,double>> extract_features(const example &e, const Z &z){
       vector<pair<int,double>> ret;
       for(int j = 0; j < L; j++){
-        int index = to_int(T(x[j],z[j]));
+        int index = to_int(T(e.x[j],z[j]));
         ret.push_back(pair<int,double>(index, 1.0));
       }
-      for(int yj : diff(y, z2y(z))){
+      for(int yj : diff(e.y, z2y(z))){
         int index = to_int(yj);
         ret.push_back(pair<int,double>(index, -1.0));
       }
@@ -195,6 +229,13 @@ class ByDerivation : public Task {
       }
       return ret;
     }
+    virtual double sumBeta(example e, double w[]){
+      double sum = 0.0;
+      for(int u : e.u){
+        sum += w[to_int(u)];
+      }
+      return sum;
+    }
     virtual void nablaLogZu(example e, double gCon[], double wt, double w[]){
       for(int x : e.x){
         double logZ = -INFINITY;
@@ -204,6 +245,11 @@ class ByDerivation : public Task {
         for(int u : e.u){
           gCon[to_int(T(x,u))] += exp(w[to_int(T(x,u))]-logZ) * wt;
         }
+      }
+    }
+    virtual void nablaSumBeta(example e, double gCon[], double wt, double w[]){
+      for(int u : e.u){
+        gCon[to_int(u)] += wt;
       }
     }
     virtual void logZbeta(double &Objective, double gObj[], double w[]){
