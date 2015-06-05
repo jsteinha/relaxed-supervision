@@ -104,7 +104,7 @@ void process_part(int index, int start, int end, double w[]){
   }
 }
 
-double rho = 0.001;
+double rho = 0.000;
 void usrfun ( int *mode,  int *nnObj, int *nnCon,
      int *nnJac, int *nnL,   int *negCon, double w[],
      double *fObj,  double gObj[],
