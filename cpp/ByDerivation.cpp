@@ -178,12 +178,12 @@ class ByDerivation : public Task {
       num_samples = 0;
       logZ = -INFINITY;
       while(true){
-        ++num_samples;
         Z z;
         for(unsigned int i = 0; i < e.x.size(); i++){
           z.push_back(sample_once(e.x[i], e.y));
         }
         if(auto_accept) return z;
+        ++num_samples;
         double cost = compute_cost(z, e.y);
         logZ = lse(logZ, -cost);
         if(rand() < exp(-cost) * RAND_MAX){

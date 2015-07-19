@@ -171,28 +171,22 @@ void process_examples(int start, int end){
 
       // generate S samples
       vector<Z> zs;
-      double logZcur; //logZ = 0.0, logZcur;
+      double logZcur, logZ = -INFINITY;
       int num_samples = 0;
       for(int s = 0; s < S; s++){
         int num_samples_cur = 0;
         zs.push_back(task->sample(ex, logZcur, num_samples_cur, false));
         num_samples += num_samples_cur;
-        //logZ += logZcur / S;
-        Z z0 = task->sample(ex, logZcur, num_samples_cur, true);
-        for(auto &a : task->extract_features(ex, z0)){
-          if(a.first >= theta_dim){
-            c_cur -= theta[a.first] * a.second/S;
-          }
-        }
+        logZ = lse(logZ, logZcur);
+        // Z z0 = task->sample(ex, logZcur, num_samples_cur, true);
+        // for(auto &a : task->extract_features(ex, z0)){
+        //   if(a.first >= theta_dim){
+        //     c_cur -= theta[a.first] * a.second/S;
+        //   }
+        // }
       }
-      //int size = 0;
-      //for(int p : ex.u) size += p;
-      //set<int> distinct_x;
-      //for(int x : ex.x) distinct_x.insert(x);
-      //cout << "SIZE " << size << " " << distinct_x.size() << endl;
-      //if(num_samples > S * 1000) cout << (num_samples/S)<< " || " << ex.x << " " << ex.u << " " << ex.y << endl;
+      c_cur -= logZ - log(S);
       printf("SAMPLES %d %.2f\n", ex_num, num_samples / (double) S);
-      //c_cur -= logZ;
       for(int s = 0; s < S; s++){
         for(auto &a : task->extract_features(ex, zs[s])){
           A_cur.push_back(pair<int,double>(a.first, a.second/S));
@@ -211,6 +205,9 @@ void process_examples(int start, int end){
 
 
 }
+
+double gObj[MAX_DIM];
+double gCon[MAX_DIM];
 
 int main(int argc, char *argv[]){
   static_assert(std::numeric_limits<float>::is_iec559, "IEEE 754 required");
@@ -393,10 +390,8 @@ int main(int argc, char *argv[]){
 
   for(int t = 0; t < TR; t++){
     if(t >= TR/2) stage = 2;
-    //if(t >= 15) stage = 2;
     task->sample_num = task->sample_denom = 0;
     cout << "Beginning iteration " << (t+1) << " (stage=" << stage << ")" << endl;
-    // initialize optimization structures
 
     // launch threads for each segment of examples
     vector<thread> threads;
@@ -413,6 +408,22 @@ int main(int argc, char *argv[]){
     snoptProblemC prob("the_optimization");
 
     for(int i=0;i<dim;i++) w[i]=theta[i];
+
+    if(algorithm == DEFAULT){
+      cout << "Measuring TAU" << endl;
+      int foo = 0;
+      int *bar = &foo;
+      double baz = 0.0;
+      double *bat = &baz;
+      double *tauA = new double[1];
+      tauA[0] = -55555;
+      usrfun(bar,  &nnObj, &nnCon, &nnJac, bar, bar, theta, bat, gObj, tauA, gCon, 
+             bar, (char*)bar, bar, bar, bar, bat, bar);
+      double log_tau_measured = tauA[0];
+      cout << ">>> TAU (measured): " << exp(log_tau_measured) << endl;
+      cout << ">>> TAU (actual)  : " << TAU << endl;
+      bu[dim] = max(log(TAU), log_tau_measured);
+    }
 
     prob.setProblemSize ( m, dim, nnCon, nnJac, nnObj );
     prob.setObjective   ( iObj, ObjAdd );
