@@ -34,8 +34,8 @@ const int DEFAULT = 0,
 const int DECIPHERMENT = 0, PREDICATE = 1;
 int stage = 1;
 
-const int numThreads = 4;
-const int MAX_DIM = 9999999; //W*W+W+5;
+const int numThreads = 24;
+const int MAX_DIM = 1999999; //W*W+W+5;
 
 double theta[MAX_DIM];
 
