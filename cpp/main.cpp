@@ -104,7 +104,7 @@ void process_part(int index, int start, int end, double w[]){
   }
 }
 
-double rho = 0.001;
+double rho = 0.000;
 void usrfun ( int *mode,  int *nnObj, int *nnCon,
      int *nnJac, int *nnL,   int *negCon, double w[],
      double *fObj,  double gObj[],
@@ -175,18 +175,30 @@ void process_examples(int start, int end){
       int num_samples = 0;
       for(int s = 0; s < S; s++){
         int num_samples_cur = 0;
-        zs.push_back(task->sample(ex, logZcur, num_samples_cur));
+        zs.push_back(task->sample(ex, logZcur, num_samples_cur, false));
         num_samples += num_samples_cur;
         //logZ += logZcur / S;
+        Z z0 = task->sample(ex, logZcur, num_samples_cur, true);
+        for(auto &a : task->extract_features(ex, z0)){
+          if(a.first >= theta_dim){
+            c_cur -= theta[a.first] * a.second/S;
+          }
+        }
       }
+      //int size = 0;
+      //for(int p : ex.u) size += p;
+      //set<int> distinct_x;
+      //for(int x : ex.x) distinct_x.insert(x);
+      //cout << "SIZE " << size << " " << distinct_x.size() << endl;
+      //if(num_samples > S * 1000) cout << (num_samples/S)<< " || " << ex.x << " " << ex.u << " " << ex.y << endl;
       printf("SAMPLES %d %.2f\n", ex_num, num_samples / (double) S);
       //c_cur -= logZ;
       for(int s = 0; s < S; s++){
         for(auto &a : task->extract_features(ex, zs[s])){
           A_cur.push_back(pair<int,double>(a.first, a.second/S));
-          if(a.first < theta_dim){
-            c_cur += theta[a.first] * a.second/S;
-          }
+          //if(a.first < theta_dim){
+          c_cur += theta[a.first] * a.second/S;
+          //}
         }
       }
       c_cur -= task->logZu(ex, theta);
@@ -381,6 +393,7 @@ int main(int argc, char *argv[]){
 
   for(int t = 0; t < TR; t++){
     if(t >= TR/2) stage = 2;
+    //if(t >= 15) stage = 2;
     task->sample_num = task->sample_denom = 0;
     cout << "Beginning iteration " << (t+1) << " (stage=" << stage << ")" << endl;
     // initialize optimization structures

@@ -180,7 +180,7 @@ class ByDenotation : public Task {
     }
     
 
-    virtual Z sample(const example &e, double &logZ, int &num_samples){
+    virtual Z sample(const example &e, double &logZ, int &num_samples, bool auto_accept){
       num_samples = 0;
       logZ = -INFINITY;
       while(true){
@@ -189,6 +189,7 @@ class ByDenotation : public Task {
         for(int i = 0; i < L; i++){
           z.push_back(sample_once(e.x[i], e.u));
         }
+        if(auto_accept) return z;
         double cost = compute_cost(z, e);
         logZ = lse(logZ, -cost);
         if(rand() < exp(-cost) * RAND_MAX){

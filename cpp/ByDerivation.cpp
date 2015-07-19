@@ -174,7 +174,7 @@ class ByDerivation : public Task {
     }
 
 
-    virtual Z sample(const example &e, double &logZ, int &num_samples){
+    virtual Z sample(const example &e, double &logZ, int &num_samples, bool auto_accept){
       num_samples = 0;
       logZ = -INFINITY;
       while(true){
@@ -183,6 +183,7 @@ class ByDerivation : public Task {
         for(unsigned int i = 0; i < e.x.size(); i++){
           z.push_back(sample_once(e.x[i], e.y));
         }
+        if(auto_accept) return z;
         double cost = compute_cost(z, e.y);
         logZ = lse(logZ, -cost);
         if(rand() < exp(-cost) * RAND_MAX){
