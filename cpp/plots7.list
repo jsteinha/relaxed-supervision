@@ -1,0 +1,8 @@
+P:145 delta:0.10
+desc 1 m1_a0_t0_U300_P145_W150_N100_f0.85_r0.8_d0.10.out AdaptFull
+desc 7 m1_b0.10_U300_P145_W150_N100_f0.85_r0.8_d0.10.out Fixed(0.1)
+desc 6 m1_b0.20_U300_P145_W150_N100_f0.85_r0.8_d0.10.out Fixed(0.2) 
+desc -1 m1_b0.50_U300_P145_W150_N100_f0.85_r0.8_d0.10.out Fixed(0.5)
+desc -1 m1_b0.80_U300_P145_W150_N100_f0.85_r0.8_d0.10.out Fixed(0.8)
+desc -1 m1_b1.00_U300_P145_W150_N100_f0.85_r0.8_d0.10.out Fixed(1.0)
+desc -1 m1_a0_t1_U300_P145_W150_N100_f0.85_r0.8_d0.10.out AdaptTied

@@ -1,0 +1,16 @@
+delta:0.00 delta2:0.0 r:1.2
+desc -1 b0.00_N50_S50_d0.00_e0.0_r1.2.out
+desc -1 m1_a0_t0.out
+desc -1 m1_a0_t0_P95_W100.out
+desc -1 m1_a0_t1.out
+desc -1 m1_a0_t1_P95_W100.out
+desc -1 m1_b0.10.out
+desc -1 m1_b0.10_P95_W100.out
+desc -1 m1_b0.20.out
+desc -1 m1_b0.20_P95_W100.out
+desc -1 m1_b0.50.out
+desc -1 m1_b0.50_P95_W100.out
+desc -1 m1_b0.80.out
+desc -1 m1_b0.80_P95_W100.out
+desc -1 m1_b1.00.out
+desc -1 m1_b1.00_P95_W100.out

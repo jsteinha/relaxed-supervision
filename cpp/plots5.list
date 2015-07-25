@@ -1,0 +1,8 @@
+model:1 U:100
+desc 1 m1_a0_t0_U100_P95_W100_N100_f0.80.out free
+desc 4 m1_b0.20_U100_P95_W100_N100_f0.80.out fixed (0.20)
+desc 5 m1_b0.50_U100_P95_W100_N100_f0.80.out fixed (0.50)
+desc 3 m1_a0_t1_U100_P95_W100_N100_f0.80.out tied
+desc 6 m1_b1.00_U100_P95_W100_N100_f0.80.out fixed (1.00)
+desc 2 m1_a0_t0_U100_P95_W100_N100_f0.80_rho0.001.out free (reg.)
+desc -1 m1_a0_t1_U100_P95_W100_N100_f0.80_rho0.001.out
