@@ -4,6 +4,10 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
+#outputdir = "/afs/cs.stanford.edu/u/jsteinhardt/NLP-HOME/scr/relaxed-supervision/output"
+#outputdir = "output5"
+outputdir = "output4"
+
 import fileinput
 args = []
 #opts = ['trace', 'trace2', 'beta']
@@ -14,6 +18,9 @@ agg = [defaultdict(list) for _ in agg_opts]
 descs = defaultdict(dict)
 for line in fileinput.input():
   toks = line.rstrip("\n").split()
+  if toks[0] == 'dir':
+    outputdir = toks[1]
+    continue
   if toks[0] == 'desc':
     order = int(toks[1])
     name = toks[2]
@@ -29,9 +36,6 @@ for line in fileinput.input():
 print 'args', args
 matches = [[] for _ in args]
 
-#outputdir = "/afs/cs.stanford.edu/u/jsteinhardt/NLP-HOME/scr/relaxed-supervision/output"
-#outputdir = "output5"
-outputdir = "output4"
 from os import listdir
 from os.path import isfile, join
 from itertools import islice

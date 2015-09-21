@@ -1,8 +1,18 @@
 P:145 delta:0.10
-desc 1 m1_a0_t0_U300_P145_W150_N100_f0.85_r0.8_d0.10.out AdaptFull
-desc 7 m1_b0.10_U300_P145_W150_N100_f0.85_r0.8_d0.10.out Fixed(0.1)
+dir output5
+desc -1 m1_a0_t0_U300_P145_W150_N100_f0.85_r0.8_d0.10.out AdaptFull
+desc 1 test_t0_t500_m1.txt AdaptFull(500)
+desc 2 test_t1_t500_m1.txt AdaptTied(500)
+desc 3 test_t0_m1.txt AdaptFull(50)
+desc 4 test_t1_m1.txt AdaptTied(50)
+desc 5 test_b0.5_m1.txt Fixed(0.5)
+desc -1 test_b0.2_m1.txt fixed(0.2)
+desc -1 m1_b0.10_U300_P145_W150_N100_f0.85_r0.8_d0.10.out Fixed(0.1)
 desc 6 m1_b0.20_U300_P145_W150_N100_f0.85_r0.8_d0.10.out Fixed(0.2) 
 desc -1 m1_b0.50_U300_P145_W150_N100_f0.85_r0.8_d0.10.out Fixed(0.5)
 desc -1 m1_b0.80_U300_P145_W150_N100_f0.85_r0.8_d0.10.out Fixed(0.8)
 desc -1 m1_b1.00_U300_P145_W150_N100_f0.85_r0.8_d0.10.out Fixed(1.0)
 desc -1 m1_a0_t1_U300_P145_W150_N100_f0.85_r0.8_d0.10.out AdaptTied
+desc -1 test_t0_s500_m1.txt
+desc -1 test_t1_x1_m1.txt
+desc -1 test_t0_x1_m1.txt

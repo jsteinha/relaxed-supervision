@@ -1,20 +1,24 @@
 dir output4
 S:50 N:50 delta:0 delta2:0 r:0
-desc 2 a0_t1_N50_S50_d0.00_e0.0_r0.0.out AdaptTied
+desc 2 test_t1_d0_r0_m0.txt AdaptTied(50)
+desc -1 a0_t1_N50_S50_d0.00_e0.0_r0.0.out AdaptTied
 desc 6 b0.05_N50_S50_d0.00_e0.0_r0.0.out Fixed(0.05)
 desc 3 b0.50_N50_S50_d0.00_e0.0_r0.0.out Fixed(0.50)
-desc 1 a0_t0_N50_S50_d0.00_e0.0_r0.0.out AdaptFull
+desc 1 test_t0_d0_r0_m0.txt AdaptFull(50)
+desc -1 a0_t0_N50_S50_d0.00_e0.0_r0.0.out AdaptFull
 desc 7 b0.01_N50_S50_d0.00_e0.0_r0.0.out Fixed(0.01)
 desc 4 b0.20_N50_S50_d0.00_e0.0_r0.0.out Fixed(0.20)
 desc 5 b0.10_N50_S50_d0.00_e0.0_r0.0.out Fixed(0.10)
 S:50 N:50 delta:0.1 delta2:0 r:0
-desc 2 a0_t1_N50_S50_d0.10_e0.0_r0.0.out  AdaptTied
+desc 2 test_t1_d0.1_r0_m0.txt AdaptTied(50)
+desc -1 a0_t1_N50_S50_d0.10_e0.0_r0.0.out  AdaptTied
 desc -1 b0.05_N50_S50_d0.10_e0.0_r0.0.out Fixed(0.05)
 desc 5 b0.50_N50_S50_d0.10_e0.0_r0.0.out  Fixed(0.5)
-desc 1 a0_t0_N50_S50_d0.10_e0.0_r0.0.out  AdaptFull
+desc 1 test_t0_d0.1_r0_m0.txt AdaptFull(50)
+desc -1 a0_t0_N50_S50_d0.10_e0.0_r0.0.out  AdaptFull
 desc -1 b0.01_N50_S50_d0.10_e0.0_r0.0.out Fixed(0.01)
 desc 6 b0.20_N50_S50_d0.10_e0.0_r0.0.out  Fixed(0.2)
-desc 7 b0.10_N50_S50_d0.10_e0.0_r0.0.out  Fixed(0.1)
+desc -1 b0.10_N50_S50_d0.10_e0.0_r0.0.out  Fixed(0.1)
 desc 4 b0.80_N50_S50_d0.10_e0.0_r0.0.out  Fixed(0.8)
 desc 3 b1.00_N50_S50_d0.10_e0.0_r0.0.out  Fixed(1.0)
 N:100 r:1.2 delta:0
@@ -26,8 +30,10 @@ desc 4 b0.20_N100_S50_d0.00_e0.0_r1.2.out Fixed(0.2)
 N:100 r:1.2 delta:0.1
 desc 3 b0.50_N100_S50_d0.10_e0.0_r1.2.out Fixed(0.5)
 desc 5 b0.10_N100_S50_d0.10_e0.0_r1.2.out Fixed(0.1)
-desc 1 a0_t0_N100_S50_d0.10_e0.0_r1.2.out AdaptFull
-desc 2 a0_t1_N100_S50_d0.10_e0.0_r1.2.out AdaptTied
+desc 1 test_t0_d0.1_r1.2_m0.txt AdaptFull(50)
+desc -1 a0_t0_N100_S50_d0.10_e0.0_r1.2.out AdaptFull
+desc 2 test_t1_d0.1_r1.2_m0.txt AdaptTied(50)
+desc -1 a0_t1_N100_S50_d0.10_e0.0_r1.2.out AdaptTied
 desc 4 b0.20_N100_S50_d0.10_e0.0_r1.2.out Fixed(0.2)
 N:250
 desc 3 b0.50_N250_S50_d0.10_e0.0_r0.0.out Fixed(0.5)

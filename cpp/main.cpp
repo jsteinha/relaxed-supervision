@@ -221,10 +221,11 @@ int main(int argc, char *argv[]){
   int opt;
   int seed = 0;
   int model = 0;
+  bool relax = false;
   int U = 300, P = 90;
   double delta = 0.0, delta2 = 0.0, r = 0.0;
   double alpha = 0.95;
-  while((opt = getopt(argc, argv, "a:b:d:e:f:r:s:m:W:U:P:N:S:T:L:t")) != -1){
+  while((opt = getopt(argc, argv, "a:b:d:e:f:r:s:m:W:U:P:N:S:T:L:tx")) != -1){
     switch(opt){
       case 'a':
         sscanf(optarg, "%d", &algorithm);
@@ -278,6 +279,10 @@ int main(int argc, char *argv[]){
         break;
       case 'm':
         sscanf(optarg, "%d", &model);
+        break;
+      case 'x':
+        relax = true;
+        cout << "using relaxed constraint" << endl;
         break;
       default:
         cout << "Exiting" << endl;
@@ -409,7 +414,7 @@ int main(int argc, char *argv[]){
 
     for(int i=0;i<dim;i++) w[i]=theta[i];
 
-    if(algorithm == DEFAULT){
+    if(relax && algorithm == DEFAULT){
       cout << "Measuring TAU" << endl;
       int foo = 0;
       int *bar = &foo;

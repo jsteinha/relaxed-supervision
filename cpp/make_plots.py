@@ -13,7 +13,7 @@ import fileinput
 args = []
 #opts = ['trace', 'trace2', 'beta']
 #opts = ['avg_samples']
-opts = ['trace2']
+opts = ['trace3']
 agg_opts = [] #[('beta_val', 'tied_beta', 'N')]
 agg = [defaultdict(list) for _ in agg_opts]
 descs = defaultdict(dict)
@@ -87,20 +87,24 @@ for arg, match in zip(args, matches):
       order = ii
     if order == -1:
       continue
+    print 'reading', ma
     f = open(join(outputdir, ma))
     iterations = []
     prev_beta = False
     prev_theta_diag = False
     prev_freqs = False
+    theta_count = 0
     iteration = []
     for line in f:
       toks = line.rstrip("\n").split()
       if len(toks) == 0:
-        prev_beta = "BETA:" in toks
-        prev_theta_diag = "THETA_diag:" in toks
-        prev_freqs = "FREQS:" in toks
+        # prev_beta = "BETA:" in toks
+        # prev_theta_diag = "THETA_diag:" in toks
+        # prev_freqs = "FREQS:" in toks
+        if prev_beta:
+          prev_beta = False
         continue
-      if "iteration" in toks:
+      if "iteration" in toks and "Beginning" in toks:
         if iteration:
           iterations.append(iteration)
         iteration = dict()
@@ -125,16 +129,50 @@ for arg, match in zip(args, matches):
         iteration['theta'] = map(float, toks)
       if prev_freqs:
         iteration['freqs'] = map(int, toks)
+      if theta_count > 0:
+        theta_count = theta_count - 1
+        iteration['theta2'].append(map(float, toks))
       prev_beta = "BETA:" in toks
       prev_theta_diag = "THETA_diag:" in toks
       prev_freqs = "FREQS:" in toks
-    print iterations
+      if "THETA:" in toks:
+        theta_count = int(full_arg['W'])
+        iteration['theta2'] = []
+    #print iterations
     if 'trace' in opts:
       V = full_arg['W']
       plt.plot([it['trace']/float(V) for it in iterations if 'trace' in it], '%s-o' % colors[ii % len(colors)]) #, label='trace (%s)' % name)
     if 'trace2' in opts:
       V = full_arg['W']
       line, = plt.plot([it['trace2']/float(V) for it in iterations if 'trace2' in it], '.-', color=colors[order % len(colors)]) #, label='%s' % name)
+      handles_dict[order] = (line, name)
+    if 'trace3' in opts:
+      V = full_arg['W']
+      trace = []
+      print 'len iterations', len(iterations)
+      for it in iterations:
+        if 'theta' not in it:
+          continue
+        cur_trace = 0
+        theta = it['theta2']
+        for ii, row in enumerate(theta):
+          ok = True
+          if int(full_arg['W']) == 150:
+            if ii > 5:
+              target = ii - 5
+            else:
+              target = len(row)-1
+          else:
+            target = ii
+          baseline = row[target]
+          for jj, col in enumerate(row):
+            if target != jj and col >= baseline:
+              ok = False
+          if ok:
+            cur_trace = cur_trace + 1
+        trace.append(cur_trace / float(V))
+      print 'len trace', len(trace), trace
+      line, = plt.plot(trace, '.-', color=colors[order % len(colors)])
       handles_dict[order] = (line, name)
     if 'avg_samples' in opts:
       line, = plt.semilogy([it['avg_samples'] for it in iterations if 'avg_samples' in it], '%s-s' % colors[order % len(colors)], label='samples/100 (%s)' % name)
@@ -163,7 +201,7 @@ for arg, match in zip(args, matches):
   plt.xlabel('iteration', fontsize=24)
   plt.ylabel('accuracy', fontsize=24)
   plt.xlim([0,50])
-  if 'trace2' in opts:
+  if 'trace2' in opts or 'trace3' in opts:
     plt.ylim([0,1])
   plt.tick_params(axis='x', labelsize=20)
   plt.tick_params(axis='y', labelsize=20)
