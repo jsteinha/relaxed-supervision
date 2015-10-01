@@ -222,10 +222,10 @@ int main(int argc, char *argv[]){
   int seed = 0;
   int model = 0;
   bool relax = false;
-  int U = 300, P = 90;
+  int U = 300, P = 90, num_bad = 0;
   double delta = 0.0, delta2 = 0.0, r = 0.0;
   double alpha = 0.95;
-  while((opt = getopt(argc, argv, "a:b:d:e:f:r:s:m:W:U:P:N:S:T:L:tx")) != -1){
+  while((opt = getopt(argc, argv, "a:b:d:e:f:r:s:m:W:U:P:N:S:T:L:B:tx")) != -1){
     switch(opt){
       case 'a':
         sscanf(optarg, "%d", &algorithm);
@@ -265,6 +265,9 @@ int main(int argc, char *argv[]){
       case 'W':
         sscanf(optarg, "%d", &W);
         break;
+      case 'B':
+        sscanf(optarg, "%d", &num_bad);
+        break;
       case 'd':
         sscanf(optarg, "%lf", &delta);
         break;
@@ -302,6 +305,7 @@ int main(int argc, char *argv[]){
   printf("OPTION W %d\n", W);
   printf("OPTION U %d\n", U);
   printf("OPTION P %d\n", P);
+  printf("OPTION num_bad %d\n", num_bad);
   printf("OPTION delta %lf\n", delta);
   printf("OPTION delta2 %lf\n", delta2);
   printf("OPTION alpha %lf\n", alpha);
@@ -381,7 +385,8 @@ int main(int argc, char *argv[]){
 
   cout << "Generating examples..." << endl;
   for(int i = 0; i < N; i++){
-    examples.push_back(task->make_example());
+    if(i < num_bad) examples.push_back(task->make_example_bad());
+    else examples.push_back(task->make_example());
   }
 
   cout << "Initializing beta..." << endl;

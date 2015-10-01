@@ -108,14 +108,14 @@ class ByDenotation : public Task {
       }
       dim = theta_dim + beta_dim;
     }
-    virtual example make_example(){
+    example make_example(bool Bad){
       example ex;
       vector<int> zs;
       for(int j = 0; j < L; j++){
         int x = power_law(V, r);
         ex.x.push_back(x);
         int z = f(ex.x[j]);
-        if(flip(delta)) z = rand() % (P+1);
+        if(Bad || flip(delta)) z = rand() % (P+1);
         zs.push_back(z);
       }
       bool any = false;
@@ -135,13 +135,19 @@ class ByDenotation : public Task {
       }
       if(!any){
         cout << "re-generating... (y = [])" << endl;
-        return make_example(); // then try again
+        return make_example(Bad); // then try again
       }
       for(int p = 0; p <= P; p++){
         ex.u.push_back(contains(predicates[p], ex.y));
       }
       for(int x : ex.x) freqs[x]++;
       return ex;
+    }
+    virtual example make_example(){
+      return make_example(false);
+    }
+    virtual example make_example_bad(){
+      return make_example(true);
     }
     virtual double init_beta(){
       return 1.0/L;

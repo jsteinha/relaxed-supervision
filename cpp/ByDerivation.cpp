@@ -48,7 +48,7 @@ class ByDerivation : public Task {
         if(!bad){
           e.y.insert(c);
         } else {
-          int c2 = rand() % W;
+          int c2 = rand() % 10;
           e.y.insert(c2);
         }
         prev_bad = bad;
@@ -125,8 +125,7 @@ class ByDerivation : public Task {
       dim = theta_dim + beta_dim;
     }
 
-    virtual example make_example(){
-      example ex = make_example_con();
+    void finalize_example(example &ex){
       set<int> u_cur;
       for(Y::iterator yj = ex.y.begin(); 
                       yj != ex.y.end(); 
@@ -135,6 +134,23 @@ class ByDerivation : public Task {
       }
       ex.u = vector<int>(u_cur.begin(), u_cur.end());
       for(int x : ex.x) freqs[x]++;
+    }
+
+    virtual example make_example_bad(){
+      example ex;
+      for(int i = 0; i < L; i++){
+        int c = rand() % W;
+        ex.x.push_back(c);
+        int c2 = 0; //rand() % W;
+        ex.y.insert(c2);
+      }
+      finalize_example(ex);
+      return ex;
+    }
+
+    virtual example make_example(){
+      example ex = make_example_con();
+      finalize_example(ex);
       return ex;
     }
     virtual double init_beta(){
@@ -143,11 +159,13 @@ class ByDerivation : public Task {
     virtual void print(){
       cout << "Printing params..." << endl;
       cout << "THETA:" << endl;
-      double trace = 0.0, trace2 = 0.0;
+      double trace = 0.0, trace2 = 0.0, trace3 = 0.0;
       vector<double> diag;
       for(int x = 0; x < W; x++){
         double logZ = -INFINITY;
+        bool ok3 = true;
         for(int y = 0; y < W; y++) logZ = lse(logZ, theta[to_int(T(x,y))]);
+        double prob_diag = exp(theta[to_int(T(x,x))]-logZ);
         for(int y = 0; y < W; y++){
           double prob = exp(theta[to_int(T(x,y))]-logZ);
           printf("%.2f ", prob);
@@ -155,21 +173,39 @@ class ByDerivation : public Task {
             trace += prob;
             if(prob > 0.75) trace2 += 1.0;
             diag.push_back(prob);
+          } else {
+            if(prob >= prob_diag){
+              ok3 = false;
+            }
           }
         }
+        if(ok3) trace3 += 1.0;
         printf("\n");
       }
       cout << "THETA_diag:" << endl;
-      for(int x = 0; x < W; x++) printf("%.2f ", diag[x]);
+      for(int x = 0; x < W; x++){
+        //if(badIds.count(x)) printf("_%.2f_ ", diag[x]);
+        //else printf("%.2f ", diag[x]);
+        printf("%.2f ", diag[x]);
+      }
       printf("\n");
       cout << "BETA:" << endl;
-      for(int y = 0; y < W; y++) printf("%.2f ", theta[to_int(y)]);
+      for(int y = 0; y < W; y++){
+        //if(badIds.count(y)) printf("_%.2f_ ", theta[to_int(y)]);
+        //else printf("%.2f ", theta[to_int(y)]);
+        printf("%.2f ", theta[to_int(y)]);
+      }
       printf("\n");
       cout << "FREQS:" << endl;
-      for(int x = 0; x < W; x++) printf("%d ", freqs[x]);
+      for(int x = 0; x < W; x++){
+        //if(badIds.count(x)) printf("_%d_ ", freqs[x]);
+        //else printf("%d ", freqs[x]);
+        printf("%d ", freqs[x]);
+      }
       printf("\n");
       printf("Trace: %.2f\n", trace);
       printf("Trace2: %.2f\n", trace2);
+      printf("Trace3: %.2f\n", trace3);
       printf("\n");
     }
 

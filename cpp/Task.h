@@ -31,6 +31,7 @@ class Task {
     Task(double theta[]) : theta(theta), sample_num(0), sample_denom(0) {}
 
     virtual example make_example() = 0;
+    virtual example make_example_bad() = 0;
     virtual double init_beta() = 0;
     virtual void print() = 0;
 
